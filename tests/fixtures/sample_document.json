@@ -1,0 +1,50 @@
+{
+  "id": "test-doc-001-abc123",
+  "title": "Reunión con Cliente BUPA - Q1 Planning",
+  "created_at": "2026-02-06T14:30:00Z",
+  "updated_at": "2026-02-06T15:15:00Z",
+  "deleted_at": null,
+  "type": "meeting",
+  "notes": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {"id": "h1", "level": 2},
+        "content": [{"type": "text", "text": "Resumen"}]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {"id": "p1"},
+        "content": [
+          {"type": "text", "text": "Se revisó el estado del proyecto KYON XR."}
+        ]
+      }
+    ]
+  },
+  "notes_plain": "",
+  "notes_markdown": "",
+  "people": {
+    "title": "Reunión con Cliente BUPA",
+    "creator": {"name": "Sebastian Suarez", "email": "sebastian@example.com"},
+    "attendees": [
+      {"email": "juan@bupa.cl", "details": {"name": "Juan Pérez"}},
+      {"email": "maria@bupa.cl", "details": {"name": "María López"}}
+    ],
+    "conferencing": null
+  },
+  "google_calendar_event": {
+    "start": {"dateTime": "2026-02-06T14:30:00-03:00", "timeZone": "America/Santiago"},
+    "end": {"dateTime": "2026-02-06T15:15:00-03:00", "timeZone": "America/Santiago"},
+    "summary": "BUPA - Q1 Planning",
+    "attendees": [
+      {"email": "sebastian@example.com"},
+      {"email": "juan@bupa.cl"},
+      {"email": "maria@bupa.cl"}
+    ]
+  },
+  "summary": "Se revisó el avance del proyecto KYON XR. Se aprobaron los mockups y se definieron próximos pasos.",
+  "overview": null,
+  "workspace_id": "ws-001",
+  "creation_source": "Windows"
+}

@@ -1,0 +1,31 @@
+# Granola-to-Obsidian Sync Configuration
+# Copy this file to config.yaml and fill in your values.
+
+# Obsidian vault root - files go directly here, no subfolders
+# macOS example: "~/Library/Mobile Documents/iCloud~md~obsidian/Documents/SebasVault"
+# Windows example: "C:\\Users\\YourName\\Documents\\ObsidianVault"
+vault_path: "~/path/to/your/ObsidianVault"
+
+# Granola credentials (auto-detected if not specified)
+# Windows: %APPDATA%\Granola\supabase.json
+# macOS: ~/Library/Application Support/Granola/supabase.json
+# credentials_path: ""
+
+# WorkOS client ID (auto-detected, override only if needed)
+# workos_client_id: "client_01JZJ0XBDAT8PHJWQY09Y0VD61"
+
+# Sync settings
+sync:
+  include_transcripts: true
+  fuzzy_threshold: 85        # 0-100 for duplicate title matching
+
+# Claude AI enrichment
+enrichment:
+  enabled: true
+  api_key: "sk-ant-..."     # Your Anthropic API key
+  model: "claude-sonnet-4-20250514"
+
+# Logging
+logging:
+  dir: "logs"
+  verbose: false

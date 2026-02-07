@@ -1,0 +1,118 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "heading",
+      "attrs": {"id": "h1", "level": 1, "timestamp": null, "timestamp-to": null},
+      "content": [
+        {"type": "text", "text": "Reunión con Cliente BUPA"}
+      ]
+    },
+    {
+      "type": "heading",
+      "attrs": {"id": "h2", "level": 2, "timestamp": "2026-02-06T14:30:00Z", "timestamp-to": "2026-02-06T14:35:00Z"},
+      "content": [
+        {"type": "text", "text": "Contexto del Proyecto"}
+      ]
+    },
+    {
+      "type": "paragraph",
+      "attrs": {"id": "p1", "timestamp": null, "timestamp-to": null},
+      "content": [
+        {"type": "text", "text": "Se discutió el avance del proyecto "},
+        {"type": "text", "text": "KYON XR", "marks": [{"type": "bold"}]},
+        {"type": "text", "text": " para el trimestre Q1 2026."}
+      ]
+    },
+    {
+      "type": "bulletList",
+      "attrs": {"tight": true},
+      "content": [
+        {
+          "type": "listItem",
+          "attrs": {"id": "li1"},
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {"type": "text", "text": "Presentación de mockups aprobada"}
+              ]
+            }
+          ]
+        },
+        {
+          "type": "listItem",
+          "attrs": {"id": "li2"},
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {"type": "text", "text": "Revisar presupuesto con "},
+                {"type": "text", "text": "equipo de finanzas", "marks": [{"type": "italic"}]}
+              ]
+            }
+          ]
+        },
+        {
+          "type": "listItem",
+          "attrs": {"id": "li3"},
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {"type": "text", "text": "Ver documentación en "},
+                {"type": "text", "text": "el portal", "marks": [{"type": "link", "attrs": {"href": "https://portal.bupa.cl", "target": "_blank", "rel": null, "class": null}}]}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "heading",
+      "attrs": {"id": "h3", "level": 2, "timestamp": null, "timestamp-to": null},
+      "content": [
+        {"type": "text", "text": "Próximos Pasos"}
+      ]
+    },
+    {
+      "type": "orderedList",
+      "attrs": {"tight": true, "start": 1, "type": null},
+      "content": [
+        {
+          "type": "listItem",
+          "attrs": {"id": "li4"},
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {"type": "text", "text": "Enviar propuesta técnica"}
+              ]
+            }
+          ]
+        },
+        {
+          "type": "listItem",
+          "attrs": {"id": "li5"},
+          "content": [
+            {
+              "type": "paragraph",
+              "content": [
+                {"type": "text", "text": "Agendar reunión de seguimiento"}
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "paragraph",
+      "attrs": {"id": "p2"},
+      "content": [
+        {"type": "text", "text": "Texto con "},
+        {"type": "text", "text": "negrita e itálica", "marks": [{"type": "bold"}, {"type": "italic"}]},
+        {"type": "text", "text": " combinadas."}
+      ]
+    }
+  ]
+}

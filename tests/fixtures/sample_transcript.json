@@ -1,0 +1,29 @@
+[
+  {
+    "id": "utt-001",
+    "document_id": "test-doc-001-abc123",
+    "start_timestamp": "2026-02-06T14:30:05Z",
+    "end_timestamp": "2026-02-06T14:30:15Z",
+    "text": "Bueno, empecemos con la revisión del proyecto KYON XR.",
+    "source": "microphone",
+    "is_final": true
+  },
+  {
+    "id": "utt-002",
+    "document_id": "test-doc-001-abc123",
+    "start_timestamp": "2026-02-06T14:30:18Z",
+    "end_timestamp": "2026-02-06T14:30:35Z",
+    "text": "Perfecto, les comparto la pantalla con los mockups actualizados.",
+    "source": "system",
+    "is_final": true
+  },
+  {
+    "id": "utt-003",
+    "document_id": "test-doc-001-abc123",
+    "start_timestamp": "2026-02-06T14:31:00Z",
+    "end_timestamp": "2026-02-06T14:31:20Z",
+    "text": "Me parece que el diseño va por buen camino, pero necesitamos revisar el presupuesto.",
+    "source": "system",
+    "is_final": true
+  }
+]
