@@ -1,6 +1,8 @@
 """Tests for Obsidian template rendering."""
 
-from granola_sync.api.models import GranolaDocument
+from datetime import datetime, timezone
+
+from granola_sync.api.models import GranolaDocument, TranscriptUtterance
 from granola_sync.converters.template import render_meeting_note
 
 
@@ -16,6 +18,28 @@ def _make_doc(**overrides) -> GranolaDocument:
     return GranolaDocument(**defaults)
 
 
+def _make_utterances() -> list[TranscriptUtterance]:
+    """Create sample transcript utterances."""
+    return [
+        TranscriptUtterance(
+            id="u1",
+            document_id="test-doc-001",
+            start_timestamp=datetime(2026, 2, 6, 14, 30, 0, tzinfo=timezone.utc),
+            end_timestamp=datetime(2026, 2, 6, 14, 30, 10, tzinfo=timezone.utc),
+            text="Hello everyone",
+            source="system",
+        ),
+        TranscriptUtterance(
+            id="u2",
+            document_id="test-doc-001",
+            start_timestamp=datetime(2026, 2, 6, 14, 30, 15, tzinfo=timezone.utc),
+            end_timestamp=datetime(2026, 2, 6, 14, 30, 25, tzinfo=timezone.utc),
+            text="Hi, thanks for joining",
+            source="microphone",
+        ),
+    ]
+
+
 def test_basic_rendering():
     doc = _make_doc()
     result = render_meeting_note(doc, "Some notes here")
@@ -24,7 +48,6 @@ def test_basic_rendering():
     assert "granola_id: test-doc-001" in result
     assert "type: meeting" in result
     assert "source: granola" in result
-    assert "# Test Meeting" in result
     assert "Some notes here" in result
 
 
@@ -59,44 +82,73 @@ def test_participants():
     assert "bob@example.com" in result
 
 
-def test_with_summary():
+def test_with_summary_no_notes():
     doc = _make_doc(summary="This was a productive meeting about Q1 goals.")
-    result = render_meeting_note(doc, "Notes")
-    assert "## Summary" in result
+    result = render_meeting_note(doc, "")
     assert "productive meeting" in result
 
 
-def test_with_enrichment():
+def test_summary_not_shown_when_notes_present():
+    doc = _make_doc(summary="Summary text")
+    result = render_meeting_note(doc, "Actual notes content")
+    assert "Actual notes content" in result
+    assert "Summary text" not in result
+
+
+def test_with_enrichment_in_frontmatter():
     doc = _make_doc()
     enrichment = {
         "projects": ["KYON XR"],
-        "action_items": ["Send proposal", "Schedule follow-up"],
         "tags": ["sales", "q1"],
         "meeting_type": "sales",
-        "follow_ups": ["Review budget next week"],
     }
     result = render_meeting_note(doc, "Notes", enrichment=enrichment)
 
-    assert "## Action Items" in result
-    assert "- [ ] Send proposal #todo" in result
-    assert "- [ ] Schedule follow-up #todo" in result
-    assert "## Follow-ups" in result
-    assert "Review budget next week" in result
     assert "KYON XR" in result
     assert "meeting_type: sales" in result
-
-
-def test_with_transcript_link():
-    doc = _make_doc()
-    result = render_meeting_note(
-        doc, "Notes", transcript_filename="2026-02-06-test-meeting-transcript.md"
-    )
-    assert "## References" in result
-    assert "[[2026-02-06-test-meeting-transcript|Full transcript]]" in result
 
 
 def test_no_enrichment():
     doc = _make_doc()
     result = render_meeting_note(doc, "Notes")
+    assert "## Action Items" not in result
+    assert "## Follow-ups" not in result
+
+
+def test_with_transcript_embedded():
+    doc = _make_doc()
+    utterances = _make_utterances()
+    result = render_meeting_note(doc, "Notes", utterances=utterances)
+
+    assert "Transcript:" in result
+    assert "**[14:30:00]** _Speaker_: Hello everyone" in result
+    assert "**[14:30:15]** _You_: Hi, thanks for joining" in result
+
+
+def test_meeting_metadata_section():
+    doc = _make_doc(
+        people={
+            "attendees": [
+                {"email": "alice@example.com"},
+            ]
+        }
+    )
+    result = render_meeting_note(doc, "Notes")
+
+    assert "Meeting Title: Test Meeting" in result
+    assert "Date: 2026-02-06" in result
+    assert "Meeting participants: alice@example.com" in result
+    assert "notes.granola.ai/t/test-doc-001" in result
+
+
+def test_no_old_format_sections():
+    """Verify old format sections are gone."""
+    doc = _make_doc(summary="Some summary")
+    result = render_meeting_note(doc, "Notes")
+
+    assert "## Summary" not in result
+    assert "## Notes" not in result
+    assert "> [!info] Context" not in result
+    assert "## References" not in result
     assert "## Action Items" not in result
     assert "## Follow-ups" not in result

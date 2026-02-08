@@ -19,7 +19,6 @@ from rich.table import Table
 from ..api.models import GranolaDocument
 from ..converters.prosemirror import ProseMirrorToMarkdown
 from ..converters.template import render_meeting_note
-from ..converters.transcript import format_transcript
 from ..utils import generate_filename
 from .dedup import fuzzy_match_title, scan_vault_for_granola_ids
 from .vault import write_note_atomic
@@ -101,7 +100,8 @@ class SyncEngine:
 
         # Build index of existing notes
         id_map = scan_vault_for_granola_ids(self.config.vault_path)
-        existing_files = list(self.config.vault_path.glob("*.md"))
+        notes_dir = self.config.vault_path / "Notas Granola"
+        existing_files = list(notes_dir.glob("*.md")) if notes_dir.exists() else []
 
         console.print(f"Found {len(docs)} documents, {len(id_map)} already synced\n")
 
@@ -145,7 +145,8 @@ class SyncEngine:
 
         docs = self.api.get_documents()
         id_map = scan_vault_for_granola_ids(self.config.vault_path)
-        existing_files = list(self.config.vault_path.glob("*.md"))
+        notes_dir = self.config.vault_path / "Notas Granola"
+        existing_files = list(notes_dir.glob("*.md")) if notes_dir.exists() else []
 
         console.print(f"Found {len(docs)} documents total\n")
 
@@ -215,23 +216,11 @@ class SyncEngine:
 
             date_str = doc.meeting_date.strftime("%Y-%m-%d")
 
-            # 2. Fetch and write transcript (if enabled)
-            transcript_filename = None
+            # 2. Fetch transcript (if enabled)
+            utterances = None
             if self.config.sync.include_transcripts:
                 try:
                     utterances = self.api.get_transcript(doc.id)
-                    if utterances:
-                        transcript_filename = generate_filename(
-                            doc.title, date_str, suffix="-transcript"
-                        )
-                        transcript_md = format_transcript(utterances, doc.title)
-                        if not self.config.dry_run:
-                            write_note_atomic(
-                                self.config.vault_path,
-                                transcript_filename,
-                                transcript_md,
-                            )
-                        logger.info("Transcript: %s", transcript_filename)
                 except Exception as e:
                     logger.warning("Failed to fetch transcript for '%s': %s", doc.title, e)
 
@@ -240,15 +229,18 @@ class SyncEngine:
             if self.enricher and not self.config.no_enrich:
                 enrichment = self.enricher.enrich(doc.title, md_content)
 
-            # 4. Render complete Obsidian note
+            # 4. Render complete Obsidian note (transcript embedded)
             note_content = render_meeting_note(
-                doc, md_content, enrichment, transcript_filename
+                doc, md_content, enrichment, utterances
             )
 
-            # 5. Write to vault
+            # 5. Write to vault subfolder
+            notes_dir = self.config.vault_path / "Notas Granola"
+            notes_dir.mkdir(exist_ok=True)
+
             filename = generate_filename(doc.title, date_str)
             if not self.config.dry_run:
-                write_note_atomic(self.config.vault_path, filename, note_content)
+                write_note_atomic(notes_dir, filename, note_content)
 
             self.stats.new += 1
             console.print(f"  [green]+[/green] {filename}")

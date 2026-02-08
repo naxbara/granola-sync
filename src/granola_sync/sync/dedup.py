@@ -42,15 +42,16 @@ def extract_granola_id(file_path: Path) -> str | None:
 
 
 def scan_vault_for_granola_ids(vault_path: Path) -> dict[str, Path]:
-    """Scan all .md files in vault root for granola_id frontmatter.
-
-    Only scans the root directory (no subdirectories) per user requirement.
+    """Scan .md files in 'Notas Granola' subfolder for granola_id frontmatter.
 
     Returns:
         Dict mapping granola_id → file path.
     """
     id_map: dict[str, Path] = {}
-    for md_file in vault_path.glob("*.md"):
+    notes_dir = vault_path / "Notas Granola"
+    if not notes_dir.exists():
+        return id_map
+    for md_file in notes_dir.glob("*.md"):
         gid = extract_granola_id(md_file)
         if gid:
             id_map[gid] = md_file

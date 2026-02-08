@@ -31,14 +31,16 @@ def test_extract_granola_id_no_id(tmp_path: Path):
 
 
 def test_scan_vault(tmp_path: Path):
-    # Create files with and without granola_id
-    (tmp_path / "meeting1.md").write_text(
+    # Create files in Notas Granola subfolder
+    notes_dir = tmp_path / "Notas Granola"
+    notes_dir.mkdir()
+    (notes_dir / "meeting1.md").write_text(
         "---\ngranola_id: id-001\n---\n\n# M1", encoding="utf-8"
     )
-    (tmp_path / "meeting2.md").write_text(
+    (notes_dir / "meeting2.md").write_text(
         "---\ngranola_id: id-002\n---\n\n# M2", encoding="utf-8"
     )
-    (tmp_path / "regular-note.md").write_text("# No frontmatter", encoding="utf-8")
+    (notes_dir / "regular-note.md").write_text("# No frontmatter", encoding="utf-8")
 
     id_map = scan_vault_for_granola_ids(tmp_path)
     assert len(id_map) == 2
