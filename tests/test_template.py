@@ -82,17 +82,19 @@ def test_participants():
     assert "bob@example.com" in result
 
 
-def test_with_summary_no_notes():
-    doc = _make_doc(summary="This was a productive meeting about Q1 goals.")
+def test_content_from_panel():
+    """Content comes from engine (extracted from last_viewed_panel)."""
+    doc = _make_doc()
+    result = render_meeting_note(doc, "### Key Takeaways\n- Item one\n- Item two")
+    assert "### Key Takeaways" in result
+    assert "- Item one" in result
+
+
+def test_empty_content():
+    """When no content is available, only metadata section appears."""
+    doc = _make_doc()
     result = render_meeting_note(doc, "")
-    assert "productive meeting" in result
-
-
-def test_summary_not_shown_when_notes_present():
-    doc = _make_doc(summary="Summary text")
-    result = render_meeting_note(doc, "Actual notes content")
-    assert "Actual notes content" in result
-    assert "Summary text" not in result
+    assert "granola_id: test-doc-001" in result
 
 
 def test_with_enrichment_in_frontmatter():
@@ -143,7 +145,7 @@ def test_meeting_metadata_section():
 
 def test_no_old_format_sections():
     """Verify old format sections are gone."""
-    doc = _make_doc(summary="Some summary")
+    doc = _make_doc()
     result = render_meeting_note(doc, "Notes")
 
     assert "## Summary" not in result

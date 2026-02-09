@@ -79,8 +79,9 @@ class GranolaDocument(BaseModel):
     subscription_plan_id: str | None = None
     status: str | None = None
     panels: list[DocumentPanel] = Field(default_factory=list, alias="documentPanels")
+    last_viewed_panel: DocumentPanel | None = None
 
-    model_config = {"populate_by_name": True}
+    model_config = {"populate_by_name": True, "extra": "ignore"}
 
     @property
     def meeting_date(self) -> datetime:

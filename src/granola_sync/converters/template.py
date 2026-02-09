@@ -59,13 +59,9 @@ def render_meeting_note(
     # Build body
     parts: list[str] = []
 
-    # Notes content (from Granola's ProseMirror or summary)
+    # Notes content (AI summary from last_viewed_panel, or user notes, or summary text)
     if markdown_content.strip():
         parts.append(markdown_content)
-        parts.append("")
-
-    if doc.summary and not markdown_content.strip():
-        parts.append(doc.summary)
         parts.append("")
 
     # Separator + meeting metadata + transcript

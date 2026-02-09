@@ -22,6 +22,22 @@ DEFAULT_HEADERS = {
 }
 
 
+def _extract_doc_list(data: object) -> list[dict]:
+    """Extract the document list from an API response.
+
+    The API wraps results in different keys depending on the endpoint:
+    - /v2/get-documents → {"docs": [...]} or list
+    - /v1/get-documents-batch → {"docs": [...]} or list
+    """
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        for key in ("docs", "documents"):
+            if key in data and isinstance(data[key], list):
+                return data[key]
+    return []
+
+
 class GranolaAPIClient:
     """Client for the Granola internal API."""
 
@@ -58,8 +74,7 @@ class GranolaAPIClient:
             resp.raise_for_status()
             data = resp.json()
 
-            # Response can be a list or wrapped in an object
-            doc_list = data if isinstance(data, list) else data.get("documents", data.get("docs", []))
+            doc_list = _extract_doc_list(data)
             if not doc_list:
                 break
 
@@ -99,7 +114,7 @@ class GranolaAPIClient:
         return utterances
 
     def get_documents_batch(self, doc_ids: list[str]) -> list[GranolaDocument]:
-        """Fetch multiple documents by ID."""
+        """Fetch multiple documents by ID (with full content including panels)."""
         resp = self._client.post(
             "/v1/get-documents-batch",
             json={
@@ -110,5 +125,5 @@ class GranolaAPIClient:
         )
         resp.raise_for_status()
         data = resp.json()
-        doc_list = data if isinstance(data, list) else data.get("documents", [])
+        doc_list = _extract_doc_list(data)
         return [GranolaDocument(**d) for d in doc_list]

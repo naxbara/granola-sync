@@ -196,23 +196,59 @@ class SyncEngine:
     def _process_document(self, doc: GranolaDocument) -> None:
         """Convert and write a single document to the vault."""
         try:
-            # 1. Convert ProseMirror notes to Markdown
-            md_content = ""
-            if doc.notes and isinstance(doc.notes, dict):
-                md_content = self.converter.convert(doc.notes)
-            elif doc.notes_markdown:
-                md_content = doc.notes_markdown or ""
-            elif doc.notes_plain:
-                md_content = doc.notes_plain or ""
+            # 0. Re-fetch full document details (list endpoint may lack panel content)
+            try:
+                full_docs = self.api.get_documents_batch([doc.id])
+                if full_docs:
+                    doc = full_docs[0]
+                    logger.debug(
+                        "Fetched full doc '%s': notes=%s, summary=%s, overview=%s, "
+                        "notes_markdown=%s, panels=%d, last_viewed_panel=%s",
+                        doc.title,
+                        bool(doc.notes),
+                        bool(doc.summary),
+                        bool(doc.overview),
+                        bool(doc.notes_markdown),
+                        len(doc.panels),
+                        bool(doc.last_viewed_panel and doc.last_viewed_panel.content),
+                    )
+            except Exception as e:
+                logger.warning("Failed to fetch full details for '%s': %s", doc.title, e)
 
-            # Also check panels for content
-            if not md_content and doc.panels:
+            # 1. Extract content — priority: last_viewed_panel (AI summary) > notes > panels > overview
+            md_content = ""
+
+            # The AI-generated summary lives in last_viewed_panel.content (ProseMirror JSON)
+            if doc.last_viewed_panel and doc.last_viewed_panel.content:
+                panel_content = doc.last_viewed_panel.content
+                if isinstance(panel_content, dict):
+                    md_content = self.converter.convert(panel_content)
+                    if md_content.strip():
+                        logger.debug("Using last_viewed_panel content for '%s'", doc.title)
+
+            # Fallback: user's raw notes (ProseMirror JSON)
+            if not md_content.strip():
+                if doc.notes and isinstance(doc.notes, dict):
+                    md_content = self.converter.convert(doc.notes)
+                elif doc.notes_markdown:
+                    md_content = doc.notes_markdown or ""
+                elif doc.notes_plain:
+                    md_content = doc.notes_plain or ""
+
+            # Fallback: other panels
+            if not md_content.strip() and doc.panels:
                 for panel in doc.panels:
                     if panel.content and isinstance(panel.content, dict):
                         panel_md = self.converter.convert(panel.content)
-                        if panel_md:
+                        if panel_md.strip():
                             md_content = panel_md
                             break
+
+            # Fallback: overview or summary text
+            if not md_content.strip() and doc.overview:
+                md_content = doc.overview
+            if not md_content.strip() and doc.summary:
+                md_content = doc.summary
 
             date_str = doc.meeting_date.strftime("%Y-%m-%d")
 
