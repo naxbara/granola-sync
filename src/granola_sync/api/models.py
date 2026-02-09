@@ -50,7 +50,7 @@ class DocumentPanel(BaseModel):
     document_id: str = ""
     id: str = ""
     title: str | None = None
-    content: dict | None = None  # ProseMirror doc
+    content: dict | str | None = None  # ProseMirror JSON dict OR HTML string
     template_slug: str | None = None
     created_at: str | None = None
     updated_at: str | None = None

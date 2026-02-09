@@ -67,6 +67,58 @@ class SyncEngine:
         self.converter = ProseMirrorToMarkdown()
         self.stats = SyncStats()
 
+    @staticmethod
+    def _html_to_markdown_basic(html: str) -> str:
+        """Convert HTML to markdown (basic conversion for legacy panel content)."""
+        import re
+
+        # Remove scripts, styles, and comments
+        text = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r"<style[^>]*>.*?</style>", "", text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r"<!--.*?-->", "", text, flags=re.DOTALL)
+
+        # Convert headings
+        for level in range(1, 7):
+            text = re.sub(
+                rf"<h{level}[^>]*>(.*?)</h{level}>",
+                lambda m: f"\n{'#' * level} {m.group(1)}\n",
+                text,
+                flags=re.DOTALL | re.IGNORECASE,
+            )
+
+        # Convert lists
+        text = re.sub(r"<li[^>]*>", "- ", text, flags=re.IGNORECASE)
+        text = re.sub(r"</li>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"</?[ou]l[^>]*>", "\n", text, flags=re.IGNORECASE)
+
+        # Convert paragraphs and breaks
+        text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"</p>", "\n\n", text, flags=re.IGNORECASE)
+        text = re.sub(r"<p[^>]*>", "", text, flags=re.IGNORECASE)
+
+        # Convert formatting
+        text = re.sub(r"<strong[^>]*>(.*?)</strong>", r"**\1**", text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r"<b[^>]*>(.*?)</b>", r"**\1**", text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r"<em[^>]*>(.*?)</em>", r"*\1*", text, flags=re.DOTALL | re.IGNORECASE)
+        text = re.sub(r"<i[^>]*>(.*?)</i>", r"*\1*", text, flags=re.DOTALL | re.IGNORECASE)
+
+        # Convert links
+        text = re.sub(
+            r'<a[^>]*href=["\']([^"\']*)["\'][^>]*>(.*?)</a>',
+            r"[\2](\1)",
+            text,
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+
+        # Remove remaining HTML tags
+        text = re.sub(r"<[^>]+>", "", text)
+
+        # Clean up whitespace
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        text = re.sub(r"[ \t]+", " ", text)
+
+        return text.strip()
+
     def run(self) -> SyncStats:
         """Execute sync based on the configured mode."""
         mode = self.config.mode
@@ -218,13 +270,19 @@ class SyncEngine:
             # 1. Extract content — priority: last_viewed_panel (AI summary) > notes > panels > overview
             md_content = ""
 
-            # The AI-generated summary lives in last_viewed_panel.content (ProseMirror JSON)
+            # The AI-generated summary lives in last_viewed_panel.content
+            # Can be ProseMirror JSON (dict) or HTML string (legacy format)
             if doc.last_viewed_panel and doc.last_viewed_panel.content:
                 panel_content = doc.last_viewed_panel.content
                 if isinstance(panel_content, dict):
                     md_content = self.converter.convert(panel_content)
                     if md_content.strip():
-                        logger.debug("Using last_viewed_panel content for '%s'", doc.title)
+                        logger.debug("Using last_viewed_panel ProseMirror content for '%s'", doc.title)
+                elif isinstance(panel_content, str):
+                    # HTML content (legacy) — convert to markdown
+                    md_content = self._html_to_markdown_basic(panel_content)
+                    if md_content.strip():
+                        logger.debug("Using last_viewed_panel HTML content for '%s'", doc.title)
 
             # Fallback: user's raw notes (ProseMirror JSON)
             if not md_content.strip():
