@@ -8,8 +8,30 @@ Handles exactly the node and mark types found in real Granola documents:
 from __future__ import annotations
 
 import logging
+import re
 
 logger = logging.getLogger(__name__)
+
+
+_MARKDOWN_STRIP_PATTERNS = [
+    (re.compile(r"\[([^\]]+)\]\([^)]+\)"), r"\1"),  # [text](url) -> text
+    (re.compile(r"\*\*([^*]+)\*\*"), r"\1"),        # **bold** -> bold
+    (re.compile(r"(?<!\*)\*([^*]+)\*(?!\*)"), r"\1"),  # *italic* -> italic
+    (re.compile(r"^(#{1,6})\s+", re.MULTILINE), ""),   # heading prefixes
+]
+
+
+def to_plain_text(doc: dict) -> str:
+    """Convert a ProseMirror doc to readable plain text (no markdown markers).
+
+    Bullet/ordered lists become "- " / "N. " prefixed lines so the structure
+    survives in a .txt file readable from Notepad.
+    """
+    md = ProseMirrorToMarkdown().convert(doc)
+    plain = md
+    for pattern, repl in _MARKDOWN_STRIP_PATTERNS:
+        plain = pattern.sub(repl, plain)
+    return plain
 
 
 class ProseMirrorToMarkdown:
