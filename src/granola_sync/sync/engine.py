@@ -152,7 +152,7 @@ class SyncEngine:
 
         # Build index of existing notes
         id_map = scan_vault_for_granola_ids(self.config.vault_path)
-        notes_dir = self.config.vault_path / "Notas Granola"
+        notes_dir = self.config.vault_path / "Reuniones"
         existing_files = list(notes_dir.glob("*.md")) if notes_dir.exists() else []
 
         console.print(f"Found {len(docs)} documents, {len(id_map)} already synced\n")
@@ -197,7 +197,7 @@ class SyncEngine:
 
         docs = self.api.get_documents()
         id_map = scan_vault_for_granola_ids(self.config.vault_path)
-        notes_dir = self.config.vault_path / "Notas Granola"
+        notes_dir = self.config.vault_path / "Reuniones"
         existing_files = list(notes_dir.glob("*.md")) if notes_dir.exists() else []
 
         console.print(f"Found {len(docs)} documents total\n")
@@ -329,7 +329,7 @@ class SyncEngine:
             )
 
             # 5. Write to vault subfolder
-            notes_dir = self.config.vault_path / "Notas Granola"
+            notes_dir = self.config.vault_path / "Reuniones"
             notes_dir.mkdir(exist_ok=True)
 
             filename = generate_filename(doc.title, date_str)

@@ -68,15 +68,22 @@ class TokenManager:
             try:
                 self._refresh()
             except httpx.HTTPStatusError as e:
-                if e.response.status_code == 401:
-                    # Refresh token was already used by Granola app — re-read one more time
-                    logger.warning("Refresh token rejected (already rotated), re-reading file")
+                # WorkOS returns 400 (invalid_grant) or 401 when the refresh token
+                # has been rotated/invalidated. Treat both the same way.
+                if e.response.status_code in (400, 401):
+                    body = e.response.text
+                    logger.warning(
+                        "Refresh token rejected (status %s): %s. Re-reading file in case Granola rotated it.",
+                        e.response.status_code,
+                        body,
+                    )
                     self._tokens = load_credentials(self._creds_path)
                     if not self._is_expired():
                         return
                     raise RuntimeError(
-                        "Token refresh failed and no valid token in supabase.json. "
-                        "Try opening the Granola app to generate fresh tokens."
+                        "WorkOS rejected the refresh token (likely expired or already rotated). "
+                        "Open the Granola desktop app to re-authenticate, then retry. "
+                        f"WorkOS response: {body}"
                     ) from e
                 raise
 

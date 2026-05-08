@@ -42,16 +42,19 @@ def extract_granola_id(file_path: Path) -> str | None:
 
 
 def scan_vault_for_granola_ids(vault_path: Path) -> dict[str, Path]:
-    """Scan .md files in 'Notas Granola' subfolder for granola_id frontmatter.
+    """Scan ALL .md files in the vault (recursively) for granola_id frontmatter.
+
+    This allows notes to be moved to any folder (Reuniones, Notas, Recursos,
+    Archivo, etc.) while still being detected as duplicates.
 
     Returns:
         Dict mapping granola_id → file path.
     """
     id_map: dict[str, Path] = {}
-    notes_dir = vault_path / "Notas Granola"
-    if not notes_dir.exists():
-        return id_map
-    for md_file in notes_dir.glob("*.md"):
+    # Skip hidden folders (.obsidian, .trash, etc.)
+    for md_file in vault_path.rglob("*.md"):
+        if any(part.startswith(".") for part in md_file.relative_to(vault_path).parts):
+            continue
         gid = extract_granola_id(md_file)
         if gid:
             id_map[gid] = md_file

@@ -6,8 +6,9 @@ dist/
 build/
 *.egg
 
-# Logs
+# Logs (also catch nested copies created when scripts run from a sub-directory)
 logs/
+**/logs/
 
 # Config with secrets
 config.yaml
