@@ -79,9 +79,16 @@ def main() -> None:
     if args.verbose:
         config.logging.verbose = True
 
+    # Anchor a relative log dir to the config file's directory (deterministic
+    # regardless of the CWD the process was launched from), not the CWD.
+    base_dir = args.config.resolve().parent if args.config.exists() else Path.cwd()
+    log_dir = Path(config.logging.dir)
+    if not log_dir.is_absolute():
+        log_dir = base_dir / log_dir
+
     # Setup logging
     log_file = setup_logging(
-        log_dir=config.logging.dir,
+        log_dir=str(log_dir),
         verbose=config.logging.verbose,
     )
 

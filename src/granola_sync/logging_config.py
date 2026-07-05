@@ -3,10 +3,24 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime
 from pathlib import Path
 
 from rich.logging import RichHandler
+
+_LOG_RETENTION_DAYS = 30
+
+
+def _cleanup_old_logs(log_path: Path, retention_days: int) -> None:
+    """Delete sync_*.log files older than retention_days (best-effort)."""
+    cutoff = time.time() - retention_days * 86400
+    for old in log_path.glob("sync_*.log"):
+        try:
+            if old.stat().st_mtime < cutoff:
+                old.unlink()
+        except OSError:
+            pass
 
 
 def setup_logging(log_dir: str = "logs", verbose: bool = False) -> Path:
@@ -21,6 +35,7 @@ def setup_logging(log_dir: str = "logs", verbose: bool = False) -> Path:
     """
     log_path = Path(log_dir)
     log_path.mkdir(parents=True, exist_ok=True)
+    _cleanup_old_logs(log_path, _LOG_RETENTION_DAYS)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     log_file = log_path / f"sync_{timestamp}.log"
