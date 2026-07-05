@@ -7,6 +7,7 @@ from pathlib import Path
 
 import yaml
 
+from .constants import DEFAULT_NOTES_FOLDER, WORKOS_CLIENT_ID
 from .utils import default_credentials_path
 
 
@@ -14,6 +15,7 @@ from .utils import default_credentials_path
 class SyncConfig:
     include_transcripts: bool = True
     fuzzy_threshold: int = 85
+    notes_folder: str = DEFAULT_NOTES_FOLDER
 
 
 @dataclass
@@ -35,7 +37,7 @@ class AppConfig:
 
     vault_path: Path = field(default_factory=lambda: Path.cwd())
     credentials_path: Path = field(default_factory=default_credentials_path)
-    workos_client_id: str = "client_01JZJ0XBDAT8PHJWQY09Y0VD61"
+    workos_client_id: str = WORKOS_CLIENT_ID
     sync: SyncConfig = field(default_factory=SyncConfig)
     enrichment: EnrichmentConfig = field(default_factory=EnrichmentConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
@@ -67,6 +69,7 @@ class AppConfig:
         config.sync = SyncConfig(
             include_transcripts=sync_data.get("include_transcripts", True),
             fuzzy_threshold=sync_data.get("fuzzy_threshold", 85),
+            notes_folder=sync_data.get("notes_folder", DEFAULT_NOTES_FOLDER),
         )
 
         enrich_data = data.get("enrichment", {})

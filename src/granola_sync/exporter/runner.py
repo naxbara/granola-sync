@@ -16,11 +16,10 @@ from ..api.client import GranolaAPIClient
 from ..api.models import GranolaDocument
 from ..auth.credentials import load_credentials
 from ..auth.token_manager import TokenManager
+from ..constants import WORKOS_CLIENT_ID
 from .txt_formatter import write_document
 
 logger = logging.getLogger(__name__)
-
-WORKOS_CLIENT_ID = "client_01JZJ0XBDAT8PHJWQY09Y0VD61"
 
 
 @dataclass

@@ -18,6 +18,7 @@ vault_path: "~/path/to/your/ObsidianVault"
 sync:
   include_transcripts: true
   fuzzy_threshold: 85        # 0-100 for duplicate title matching
+  notes_folder: "Reuniones"  # Obsidian subfolder for synced meeting notes
 
 # Claude AI enrichment
 enrichment:
