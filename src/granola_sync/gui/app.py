@@ -25,7 +25,6 @@ from tkinter import filedialog, messagebox, ttk
 from .. import __version__
 from ..auth.credentials import load_credentials
 from ..exporter.runner import ExportProgress, ExportResult, export_documents
-from ..logging_config import setup_logging
 from ..utils import default_credentials_path
 
 logger = logging.getLogger(__name__)
@@ -429,13 +428,21 @@ class ErrorFrame(ttk.Frame):
 
 
 def main() -> None:
-    # Log to a file in a user-writable location so scheduled/packaged runs leave
-    # a trail (basicConfig was console-only and lost when the window closed).
+    # Log to a file in a user-writable location so the packaged (windowed) app
+    # leaves a trail — a windowed .exe has no console, so a plain FileHandler is
+    # used directly instead of the CLI's Rich console logging.
     log_dir = Path.home() / ".granola_notes" / "logs"
+    handlers: list[logging.Handler] = []
     try:
-        setup_logging(log_dir=str(log_dir), verbose=False)
+        log_dir.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.FileHandler(log_dir / "granola-notes.log", encoding="utf-8"))
     except OSError:
-        logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+        pass
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s %(message)s",
+        handlers=handlers or None,
+    )
     app = App()
     app.run()
 
