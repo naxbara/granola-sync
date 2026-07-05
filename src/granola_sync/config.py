@@ -45,6 +45,7 @@ class AppConfig:
     # CLI overrides (not in YAML)
     mode: str = "daily"
     from_date: str | None = None
+    to_date: str | None = None
     dry_run: bool = False
     no_enrich: bool = False
 

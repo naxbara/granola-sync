@@ -18,8 +18,9 @@ import subprocess
 import sys
 import threading
 import tkinter as tk
+from datetime import date, datetime
 from pathlib import Path
-from tkinter import filedialog, ttk
+from tkinter import filedialog, messagebox, ttk
 
 from .. import __version__
 from ..auth.credentials import load_credentials
@@ -111,12 +112,19 @@ class App:
 
     # ----- export lifecycle -----
 
-    def start_export(self, output_dir: Path, days_back: int | None, include_transcripts: bool) -> None:
+    def start_export(
+        self,
+        output_dir: Path,
+        days_back: int | None,
+        include_transcripts: bool,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> None:
         self._cancel_flag.clear()
         self._show_progress_frame()
         self._worker = threading.Thread(
             target=self._run_export,
-            args=(output_dir, days_back, include_transcripts),
+            args=(output_dir, days_back, include_transcripts, date_from, date_to),
             daemon=True,
         )
         self._worker.start()
@@ -124,7 +132,14 @@ class App:
     def cancel_export(self) -> None:
         self._cancel_flag.set()
 
-    def _run_export(self, output_dir: Path, days_back: int | None, include_transcripts: bool) -> None:
+    def _run_export(
+        self,
+        output_dir: Path,
+        days_back: int | None,
+        include_transcripts: bool,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> None:
         def on_progress(p: ExportProgress) -> None:
             self._event_queue.put(("progress", p))
 
@@ -136,6 +151,8 @@ class App:
                 include_transcripts=include_transcripts,
                 on_progress=on_progress,
                 should_cancel=self._cancel_flag.is_set,
+                date_from=date_from,
+                date_to=date_to,
             )
             self._event_queue.put(("done", result))
         except Exception as e:
@@ -163,6 +180,8 @@ class ConfigFrame(ttk.Frame):
         self.app = app
         self.output_var = tk.StringVar(value=str(_default_output_dir()))
         self.range_var = tk.StringVar(value="day")
+        self.from_var = tk.StringVar()
+        self.to_var = tk.StringVar()
         self.transcripts_var = tk.BooleanVar(value=True)
         self._build()
 
@@ -192,8 +211,29 @@ class ConfigFrame(ttk.Frame):
             ("week", "Últimos 7 días"),
             ("month", "Último mes"),
             ("all", "Todo el historial"),
+            ("custom", "Rango de fechas…"),
         ):
-            ttk.Radiobutton(self, text=label, value=value, variable=self.range_var).pack(anchor="w")
+            ttk.Radiobutton(
+                self, text=label, value=value, variable=self.range_var,
+                command=self._on_range_change,
+            ).pack(anchor="w")
+
+        # Custom date-range inputs — enabled only when "Rango de fechas…" is picked.
+        self.date_row = ttk.Frame(self)
+        self.date_row.pack(fill="x", pady=(6, 0), padx=(22, 0))
+        ttk.Label(self.date_row, text="Desde").grid(row=0, column=0, sticky="w")
+        self.from_entry = ttk.Entry(self.date_row, textvariable=self.from_var, width=13)
+        self.from_entry.grid(row=0, column=1, padx=(6, 14))
+        ttk.Label(self.date_row, text="Hasta").grid(row=0, column=2, sticky="w")
+        self.to_entry = ttk.Entry(self.date_row, textvariable=self.to_var, width=13)
+        self.to_entry.grid(row=0, column=3, padx=(6, 0))
+        ttk.Label(
+            self,
+            text="Formato AAAA-MM-DD. Deja «Hasta» vacío para llegar hasta hoy; "
+                 "usa la misma fecha en ambos campos para un solo día.",
+            foreground="#777", font=(_FONT_UI, 8), wraplength=480,
+        ).pack(anchor="w", padx=(22, 0), pady=(3, 0))
+        self._on_range_change()
 
         ttk.Checkbutton(
             self, text="Incluir transcripción completa", variable=self.transcripts_var
@@ -215,9 +255,54 @@ class ConfigFrame(ttk.Frame):
         if chosen:
             self.output_var.set(chosen)
 
+    def _on_range_change(self) -> None:
+        state = "normal" if self.range_var.get() == "custom" else "disabled"
+        self.from_entry.configure(state=state)
+        self.to_entry.configure(state=state)
+
+    @staticmethod
+    def _parse_date(text: str, label: str, required: bool):
+        """Parse an AAAA-MM-DD field.
+
+        Returns a date, or None when empty and optional. Shows an error dialog
+        and returns False on an invalid value or a missing required one.
+        """
+        text = text.strip()
+        if not text:
+            if required:
+                messagebox.showerror("Falta una fecha", f"Ingresa la fecha «{label}» (AAAA-MM-DD).")
+                return False
+            return None
+        try:
+            return datetime.strptime(text, "%Y-%m-%d").date()
+        except ValueError:
+            messagebox.showerror(
+                "Fecha inválida",
+                f"«{label}» debe tener el formato AAAA-MM-DD (ej. 2026-07-01).",
+            )
+            return False
+
     def _on_export(self) -> None:
         output_dir = Path(self.output_var.get()).expanduser()
-        days = {"day": 1, "week": 7, "month": 30, "all": None}[self.range_var.get()]
+        choice = self.range_var.get()
+
+        if choice == "custom":
+            date_from = self._parse_date(self.from_var.get(), "Desde", required=True)
+            if date_from is False:
+                return
+            date_to = self._parse_date(self.to_var.get(), "Hasta", required=False)
+            if date_to is False:
+                return
+            if date_to is not None and date_to < date_from:
+                messagebox.showerror("Rango inválido", "«Hasta» no puede ser anterior a «Desde».")
+                return
+            self.app.start_export(
+                output_dir, None, self.transcripts_var.get(),
+                date_from=date_from, date_to=date_to,
+            )
+            return
+
+        days = {"day": 1, "week": 7, "month": 30, "all": None}[choice]
         self.app.start_export(output_dir, days, self.transcripts_var.get())
 
 

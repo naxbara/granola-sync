@@ -64,6 +64,9 @@ granola-sync --mode=daily
 # Historical: importar todo desde una fecha
 granola-sync --mode=historical --from=2024-01-01
 
+# Historical: un rango cerrado de fechas (--to es inclusive)
+granola-sync --mode=historical --from=2026-06-01 --to=2026-06-30
+
 # Verify: verificar integridad de notas existentes
 granola-sync --mode=verify
 

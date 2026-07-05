@@ -119,12 +119,27 @@ class SyncEngine:
             return
 
         from_date = self._as_utc(datetime.fromisoformat(from_date_str))
-        console.print(f"Importing documents from {from_date_str}...")
+
+        # Optional inclusive end date: keep anything strictly before the next day.
+        to_date_excl = None
+        if self.config.to_date:
+            to_date_excl = self._as_utc(datetime.fromisoformat(self.config.to_date)) + timedelta(days=1)
+
+        window = from_date_str + (f" to {self.config.to_date}" if self.config.to_date else " onward")
+        console.print(f"Importing documents from {window}...")
 
         docs = self.api.get_documents()
         console.print(f"Found {len(docs)} documents total\n")
 
-        self._process_new(docs, keep=lambda d: self._as_utc(d.created_at) >= from_date)
+        def keep(d: GranolaDocument) -> bool:
+            created = self._as_utc(d.created_at)
+            if created < from_date:
+                return False
+            if to_date_excl is not None and created >= to_date_excl:
+                return False
+            return True
+
+        self._process_new(docs, keep=keep)
 
     def _process_new(self, docs, keep) -> None:
         """Filter docs in the date window, batch-hydrate, and create/update notes.

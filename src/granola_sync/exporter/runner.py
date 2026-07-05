@@ -9,7 +9,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 from ..api.client import GranolaAPIClient
@@ -45,22 +45,39 @@ class ExportResult:
         return len(self.written_files)
 
 
-def _filter_by_range(
-    docs: list[GranolaDocument], days_back: int | None
+def _filter_docs(
+    docs: list[GranolaDocument],
+    days_back: int | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> list[GranolaDocument]:
-    if days_back is None:
-        return [d for d in docs if not d.deleted_at]
-    cutoff = datetime.now(UTC) - timedelta(days=days_back)
-    out: list[GranolaDocument] = []
-    for d in docs:
-        if d.deleted_at:
-            continue
-        created = d.meeting_date
-        if created.tzinfo is None:
-            created = created.replace(tzinfo=UTC)
-        if created >= cutoff:
+    """Filter meetings by an explicit date range or a rolling day window.
+
+    An explicit ``date_from``/``date_to`` (inclusive, compared against the
+    meeting's local calendar date) takes precedence. Otherwise ``days_back``
+    keeps the last N days (None = all history).
+    """
+    live = [d for d in docs if not d.deleted_at]
+
+    if date_from is not None or date_to is not None:
+        out: list[GranolaDocument] = []
+        for d in live:
+            md = _as_utc(d.meeting_date).astimezone().date()
+            if date_from is not None and md < date_from:
+                continue
+            if date_to is not None and md > date_to:
+                continue
             out.append(d)
-    return out
+        return out
+
+    if days_back is None:
+        return live
+    cutoff = datetime.now(UTC) - timedelta(days=days_back)
+    return [d for d in live if _as_utc(d.meeting_date) >= cutoff]
+
+
+def _as_utc(dt: datetime) -> datetime:
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
 
 def export_documents(
@@ -70,6 +87,8 @@ def export_documents(
     include_transcripts: bool = True,
     on_progress: Callable[[ExportProgress], None] | None = None,
     should_cancel: Callable[[], bool] | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
 ) -> ExportResult:
     """Fetch Granola meetings and write one .txt per meeting.
 
@@ -81,6 +100,8 @@ def export_documents(
         include_transcripts: Whether to fetch and embed transcripts.
         on_progress: Optional callback for each document processed.
         should_cancel: Optional poll function; if it returns True, stop early.
+        date_from: Optional inclusive start date. Takes precedence over days_back.
+        date_to: Optional inclusive end date. Takes precedence over days_back.
     """
     tm = TokenManager(credentials_path, WORKOS_CLIENT_ID)
     api = GranolaAPIClient(tm)
@@ -91,7 +112,7 @@ def export_documents(
         _ = load_credentials(credentials_path)
 
         all_docs = api.get_documents()
-        docs = _filter_by_range(all_docs, days_back)
+        docs = _filter_docs(all_docs, days_back, date_from, date_to)
         total = len(docs)
         logger.info("Exporting %d/%d documents", total, len(all_docs))
 

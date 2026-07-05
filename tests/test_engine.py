@@ -118,6 +118,24 @@ def test_document_tolerates_null_title():
     assert doc.title == ""
 
 
+def test_historical_respects_from_and_to(tmp_path: Path):
+    docs = [
+        _doc("a", created=datetime(2026, 7, 1, 12, tzinfo=UTC), updated=datetime(2026, 7, 1, 12, tzinfo=UTC), title="Uno"),
+        _doc("b", created=datetime(2026, 7, 3, 12, tzinfo=UTC), updated=datetime(2026, 7, 3, 12, tzinfo=UTC), title="Dos"),
+        _doc("c", created=datetime(2026, 7, 5, 12, tzinfo=UTC), updated=datetime(2026, 7, 5, 12, tzinfo=UTC), title="Tres"),
+    ]
+    api = FakeAPI(docs)
+    cfg = _config(tmp_path, mode="historical", from_date="2026-07-01", to_date="2026-07-03")
+    engine = SyncEngine(cfg, api)
+
+    engine.run()
+
+    # "a" and "b" fall in [07-01, 07-03]; "c" (07-05) is excluded.
+    assert engine.stats.new == 2
+    hydrated = [doc_id for call in api.batch_calls for doc_id in call]
+    assert set(hydrated) == {"a", "b"}
+
+
 def test_daily_skips_docs_older_than_24h(tmp_path: Path):
     old = datetime(2020, 1, 1, tzinfo=UTC)
     doc = _doc("d1", created=old, updated=old)

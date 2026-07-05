@@ -394,6 +394,10 @@
           <p><code class="inl">sync.notes_folder</code> decide en qué subcarpeta del vault caen las notas (por defecto <code class="inl">Reuniones</code>).</p>
         </div>
         <div class="feat">
+          <div class="ft"><h4>Rango de fechas</h4><span class="tag">Nuevo</span></div>
+          <p>Elige una fecha o un rango exacto (desde&ndash;hasta), en la app con ventana y en el CLI con <code class="inl">--to</code>.</p>
+        </div>
+        <div class="feat">
           <div class="ft"><h4>Verificación más estricta</h4><span class="tag">Nuevo</span></div>
           <p><code class="inl">--mode=verify</code> ahora detecta notas con cuerpo vacío, no solo archivos cortos.</p>
         </div>
@@ -531,6 +535,7 @@ logging:
           <tbody>
             <tr><td><code>--mode=&lt;m&gt;</code></td><td class="d"><code>daily</code> · <code>historical</code> · <code>verify</code> · <code>dry-run</code>. Por defecto <code>daily</code>.</td></tr>
             <tr><td><code>--from=&lt;fecha&gt;</code></td><td class="d">Fecha de inicio para el modo <code>historical</code> (formato <code>YYYY-MM-DD</code>).</td></tr>
+            <tr><td><code>--to=&lt;fecha&gt;</code></td><td class="d">Fecha de fin <em>inclusive</em> para <code>historical</code>. Con <code>--from</code> define un rango cerrado.</td></tr>
             <tr><td><code>--config=&lt;ruta&gt;</code></td><td class="d">Usar un archivo de configuración distinto a <code>config.yaml</code>.</td></tr>
             <tr><td><code>--vault=&lt;ruta&gt;</code></td><td class="d">Sobrescribir la ruta del vault sin editar el config.</td></tr>
             <tr><td><code>--no-enrich</code></td><td class="d">Saltar el enrichment con IA en esta corrida.</td></tr>
@@ -576,7 +581,7 @@ logging:
       </div>
       <ol class="steps">
         <li>Elige la carpeta de salida.</li>
-        <li>Elige el rango: últimas 24 h, últimos 7 días, último mes o todo el historial.</li>
+        <li>Elige el rango: últimas 24 h, 7 días, un mes, todo el historial, o un <strong>rango de fechas exacto</strong> (desde&ndash;hasta; misma fecha en ambos = un solo día).</li>
         <li>Marca si quieres incluir la transcripción completa.</li>
         <li>Presiona <strong>Exportar</strong> y al final abre la carpeta con un clic.</li>
       </ol>

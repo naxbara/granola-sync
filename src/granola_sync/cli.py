@@ -32,6 +32,13 @@ def main() -> None:
         help="Start date for historical mode (YYYY-MM-DD)",
     )
     parser.add_argument(
+        "--to",
+        dest="to_date",
+        type=str,
+        default=None,
+        help="End date for historical mode (YYYY-MM-DD, inclusive)",
+    )
+    parser.add_argument(
         "--config",
         type=Path,
         default=Path("config.yaml"),
@@ -70,6 +77,7 @@ def main() -> None:
     # Apply CLI overrides
     config.mode = args.mode
     config.from_date = args.from_date
+    config.to_date = args.to_date
     config.no_enrich = args.no_enrich
     config.dry_run = args.mode == "dry-run"
 
