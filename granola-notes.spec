@@ -3,7 +3,8 @@
 # Output:    dist/Granola Notes.exe
 #
 # Strategy: --onefile --windowed, with explicit excludes to keep the binary
-# minimal. The GUI subtree only needs auth, api, exporter, converters/prosemirror.
+# minimal. The GUI subtree needs auth, api, exporter, converters (prosemirror,
+# html, template) and yaml — the last two power the Obsidian Markdown export.
 
 # -*- mode: python ; coding: utf-8 -*-
 
@@ -23,8 +24,7 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[
-        # Markdown / Obsidian path — not needed for .txt export
-        "granola_sync.converters.template",
+        # Obsidian sync engine — the GUI exports standalone files, no vault/dedup
         "granola_sync.sync",
         "granola_sync.sync.engine",
         "granola_sync.sync.dedup",
@@ -35,7 +35,6 @@ a = Analysis(
         # CLI / config (the GUI bypasses YAML config entirely)
         "granola_sync.cli",
         "granola_sync.config",
-        "yaml",
         "thefuzz",
         "rapidfuzz",
         "rich",

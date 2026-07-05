@@ -359,7 +359,7 @@
       <p>Hay <strong>dos formas de usarla</strong>, según quién seas:</p>
       <ul>
         <li><strong>Línea de comandos</strong> (<code class="inl">granola-sync</code>) &mdash; el flujo completo hacia Obsidian, ideal para dejar corriendo automático.</li>
-        <li><strong>App con ventana</strong> (<code class="inl">granola-notes-gui</code>) &mdash; para personas no técnicas: exporta un archivo <code class="inl">.txt</code> por reunión, sin tocar la terminal.</li>
+        <li><strong>App con ventana</strong> (<code class="inl">granola-notes-gui</code>) &mdash; para personas no técnicas: exporta un archivo por reunión (<code class="inl">.txt</code>, o <code class="inl">.md</code> para Obsidian), sin tocar la terminal.</li>
       </ul>
     </section>
 
@@ -396,6 +396,10 @@
         <div class="feat">
           <div class="ft"><h4>Rango de fechas</h4><span class="tag">Nuevo</span></div>
           <p>Elige una fecha o un rango exacto (desde&ndash;hasta), en la app con ventana y en el CLI con <code class="inl">--to</code>.</p>
+        </div>
+        <div class="feat">
+          <div class="ft"><h4>Markdown desde la GUI</h4><span class="tag">Nuevo</span></div>
+          <p>La app con ventana ahora exporta también <code class="inl">.md</code> con frontmatter, listo para Obsidian &mdash; no solo <code class="inl">.txt</code>.</p>
         </div>
         <div class="feat">
           <div class="ft"><h4>Verificación más estricta</h4><span class="tag">Nuevo</span></div>
@@ -573,8 +577,8 @@ logging:
     <!-- EXPORTAR -->
     <section id="exportar">
       <p class="eyebrow">Paso 6</p>
-      <h2>Exportar a .txt (app con ventana)</h2>
-      <p>Para quien no usa la terminal. Es una aplicación con ventana que genera <strong>un archivo <code class="inl">.txt</code> por reunión</strong>, con resumen y transcripción, en la carpeta que elijas &mdash; sin Obsidian de por medio. Corre en Windows y macOS.</p>
+      <h2>Exportar a .txt o Markdown (app con ventana)</h2>
+      <p>Para quien no usa la terminal. Es una aplicación con ventana que genera <strong>un archivo por reunión</strong> &mdash; <code class="inl">.txt</code> para leer en cualquier editor, o <code class="inl">.md</code> (Markdown con frontmatter, idéntico al del CLI) para Obsidian &mdash; en la carpeta que elijas. Corre en Windows y macOS.</p>
       <div class="term">
         <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">terminal</span><button class="copy" type="button">copiar</button></div>
 <pre><span class="pr">$</span> granola-notes-gui</pre>
@@ -583,9 +587,14 @@ logging:
         <li>Elige la carpeta de salida.</li>
         <li>Elige el rango: últimas 24 h, 7 días, un mes, todo el historial, o un <strong>rango de fechas exacto</strong> (desde&ndash;hasta; misma fecha en ambos = un solo día).</li>
         <li>Marca si quieres incluir la transcripción completa.</li>
+        <li>Elige el <strong>formato</strong>: <code class="inl">.txt</code> (texto) o <code class="inl">.md</code> (Markdown para Obsidian).</li>
         <li>Presiona <strong>Exportar</strong> y al final abre la carpeta con un clic.</li>
       </ol>
-      <p>Los archivos usan UTF-8 con BOM en Windows para que el Bloc de notas y Word muestren bien los acentos; en macOS abren directo con TextEdit.</p>
+      <p>Los <code class="inl">.txt</code> usan UTF-8 con BOM en Windows para que el Bloc de notas y Word muestren bien los acentos. Los <code class="inl">.md</code> son UTF-8 plano, con frontmatter YAML, listos para tu vault.</p>
+      <div class="call">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16v-4"/><path d="M12 8h.01"/><circle cx="12" cy="12" r="9"/></svg>
+        <div class="bd"><span class="lb">GUI .md vs. CLI</span><p>La opción <code class="inl">.md</code> de la GUI es una exportación puntual (escribe los archivos en la carpeta que elijas). Para el flujo completo a Obsidian &mdash; duplicados, actualización de notas modificadas y enrichment &mdash; usa el CLI (<code class="inl">granola-sync</code>), que sincroniza a tu vault.</p></div>
+      </div>
     </section>
 
     <!-- ENRICHMENT -->
@@ -647,7 +656,7 @@ logging:
             <tr><td><code>granola-sync --mode=historical --from=…</code></td><td class="d">Importar desde una fecha.</td></tr>
             <tr><td><code>granola-sync --mode=dry-run</code></td><td class="d">Ver qué haría, sin escribir ni gastar.</td></tr>
             <tr><td><code>granola-sync --mode=verify</code></td><td class="d">Revisar integridad de las notas.</td></tr>
-            <tr><td><code>granola-notes-gui</code></td><td class="d">Abrir la app con ventana para exportar a .txt.</td></tr>
+            <tr><td><code>granola-notes-gui</code></td><td class="d">Abrir la app con ventana para exportar a .txt o .md (Obsidian).</td></tr>
             <tr><td><code>pytest</code></td><td class="d">Correr la suite de tests (66 en la 1.0).</td></tr>
           </tbody>
         </table>

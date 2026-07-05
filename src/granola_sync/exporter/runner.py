@@ -17,6 +17,7 @@ from ..api.models import GranolaDocument
 from ..auth.credentials import load_credentials
 from ..auth.token_manager import TokenManager
 from ..constants import WORKOS_CLIENT_ID
+from .md_formatter import write_markdown_document
 from .txt_formatter import write_document
 
 logger = logging.getLogger(__name__)
@@ -89,11 +90,12 @@ def export_documents(
     should_cancel: Callable[[], bool] | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
+    fmt: str = "txt",
 ) -> ExportResult:
-    """Fetch Granola meetings and write one .txt per meeting.
+    """Fetch Granola meetings and write one file per meeting.
 
     Args:
-        output_dir: Where to write the .txt files.
+        output_dir: Where to write the files.
         credentials_path: Path to Granola's supabase.json (the .enc twin will
             be auto-detected and decrypted when newer).
         days_back: How many days back to include. None = all history.
@@ -102,7 +104,9 @@ def export_documents(
         should_cancel: Optional poll function; if it returns True, stop early.
         date_from: Optional inclusive start date. Takes precedence over days_back.
         date_to: Optional inclusive end date. Takes precedence over days_back.
+        fmt: Output format — "txt" (plain text) or "md" (Obsidian Markdown).
     """
+    write_one = write_markdown_document if fmt == "md" else write_document
     tm = TokenManager(credentials_path, WORKOS_CLIENT_ID)
     api = GranolaAPIClient(tm)
     result = ExportResult(output_dir=output_dir)
@@ -135,7 +139,7 @@ def export_documents(
                         logger.warning("Transcript failed for '%s': %s", doc.title, e)
                         transcript = []
 
-                path = write_document(output_dir, full_doc, transcript)
+                path = write_one(output_dir, full_doc, transcript)
                 result.written_files.append(path)
             except Exception as e:
                 result.errors += 1

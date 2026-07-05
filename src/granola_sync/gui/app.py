@@ -118,12 +118,13 @@ class App:
         include_transcripts: bool,
         date_from: date | None = None,
         date_to: date | None = None,
+        fmt: str = "txt",
     ) -> None:
         self._cancel_flag.clear()
         self._show_progress_frame()
         self._worker = threading.Thread(
             target=self._run_export,
-            args=(output_dir, days_back, include_transcripts, date_from, date_to),
+            args=(output_dir, days_back, include_transcripts, date_from, date_to, fmt),
             daemon=True,
         )
         self._worker.start()
@@ -138,6 +139,7 @@ class App:
         include_transcripts: bool,
         date_from: date | None = None,
         date_to: date | None = None,
+        fmt: str = "txt",
     ) -> None:
         def on_progress(p: ExportProgress) -> None:
             self._event_queue.put(("progress", p))
@@ -152,6 +154,7 @@ class App:
                 should_cancel=self._cancel_flag.is_set,
                 date_from=date_from,
                 date_to=date_to,
+                fmt=fmt,
             )
             self._event_queue.put(("done", result))
         except Exception as e:
@@ -182,6 +185,7 @@ class ConfigFrame(ttk.Frame):
         self.from_var = tk.StringVar()
         self.to_var = tk.StringVar()
         self.transcripts_var = tk.BooleanVar(value=True)
+        self.format_var = tk.StringVar(value="txt")
         self._build()
 
     def _build(self) -> None:
@@ -238,6 +242,14 @@ class ConfigFrame(ttk.Frame):
             self, text="Incluir transcripción completa", variable=self.transcripts_var
         ).pack(anchor="w", pady=(14, 0))
 
+        # Output format
+        ttk.Label(self, text="Formato de salida:").pack(anchor="w", pady=(14, 0))
+        for value, label in (
+            ("txt", "Texto (.txt) — para leer en Bloc de notas / TextEdit"),
+            ("md", "Markdown (.md) — para Obsidian"),
+        ):
+            ttk.Radiobutton(self, text=label, value=value, variable=self.format_var).pack(anchor="w")
+
         ttk.Button(
             self, text="Exportar", command=self._on_export, style="Accent.TButton"
         ).pack(pady=(20, 0), ipadx=20, ipady=4)
@@ -284,6 +296,7 @@ class ConfigFrame(ttk.Frame):
     def _on_export(self) -> None:
         output_dir = Path(self.output_var.get()).expanduser()
         choice = self.range_var.get()
+        fmt = self.format_var.get()
 
         if choice == "custom":
             date_from = self._parse_date(self.from_var.get(), "Desde", required=True)
@@ -297,12 +310,12 @@ class ConfigFrame(ttk.Frame):
                 return
             self.app.start_export(
                 output_dir, None, self.transcripts_var.get(),
-                date_from=date_from, date_to=date_to,
+                date_from=date_from, date_to=date_to, fmt=fmt,
             )
             return
 
         days = {"day": 1, "week": 7, "month": 30, "all": None}[choice]
-        self.app.start_export(output_dir, days, self.transcripts_var.get())
+        self.app.start_export(output_dir, days, self.transcripts_var.get(), fmt=fmt)
 
 
 class ProgressFrame(ttk.Frame):
@@ -363,12 +376,19 @@ class ResultFrame(ttk.Frame):
             side="left", ipadx=10, ipady=4
         )
 
-        _editor_tip = (
-            "Tip: cada archivo .txt se abre con TextEdit o cualquier editor de texto."
-            if sys.platform == "darwin" else
-            "Tip: cada archivo .txt se abre con el Bloc de notas o Word. "
-            "Si no ves los acentos correctamente, abre con Word o Bloc de notas (UTF-8)."
-        )
+        is_md = bool(self.result.written_files) and self.result.written_files[0].suffix == ".md"
+        if is_md:
+            _editor_tip = (
+                "Tip: son archivos .md. Ponlos en una carpeta dentro de tu vault de "
+                "Obsidian (o exporta directo ahí) para verlos como notas."
+            )
+        elif sys.platform == "darwin":
+            _editor_tip = "Tip: cada archivo .txt se abre con TextEdit o cualquier editor de texto."
+        else:
+            _editor_tip = (
+                "Tip: cada archivo .txt se abre con el Bloc de notas o Word. "
+                "Si no ves los acentos correctamente, abre con Word o Bloc de notas (UTF-8)."
+            )
         ttk.Label(
             self,
             text=_editor_tip,
