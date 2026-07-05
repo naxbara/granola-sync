@@ -9,40 +9,19 @@ The format targets non-technical users opening the .txt in Notepad/TextEdit/Word
 
 from __future__ import annotations
 
-import html
 import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ..api.models import GranolaDocument, TranscriptUtterance
+from ..converters.html import html_to_plain_text
 from ..converters.prosemirror import to_plain_text
 from ..utils import slugify_title
 
 # Older Granola transcripts embed a "Speaker A: " / "Speaker B: " prefix in the
 # text itself. Detect that so we don't double-prefix with our own label.
 _EMBEDDED_SPEAKER_RE = re.compile(r"^(Speaker [A-Z]):\s*(.*)", re.DOTALL)
-
-
-def _html_to_plain_text(content: str) -> str:
-    """Best-effort HTML → plain text for legacy Granola panel content.
-
-    Converts <li> to "- ", <h*> to a blank-line-padded line, drops other tags,
-    and unescapes HTML entities. Not a real HTML parser — Granola panel HTML
-    is consistently shallow (h3/ul/li/p/br/strong/em).
-    """
-    text = re.sub(r"<(script|style)[^>]*>.*?</\1>", "", content, flags=re.DOTALL | re.IGNORECASE)
-    text = re.sub(r"<li[^>]*>", "- ", text, flags=re.IGNORECASE)
-    text = re.sub(r"</li>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"</?[ou]l[^>]*>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"<h[1-6][^>]*>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"</h[1-6]>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"<br\s*/?>", "\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"</p>", "\n\n", text, flags=re.IGNORECASE)
-    text = re.sub(r"<[^>]+>", "", text)
-    text = html.unescape(text)
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    return text.strip()
 
 _SPANISH_MONTHS = [
     "",
@@ -99,7 +78,7 @@ def _extract_summary_text(doc: GranolaDocument) -> str:
             if text.strip():
                 return text
         elif isinstance(content, str):
-            text = _html_to_plain_text(content)
+            text = html_to_plain_text(content)
             if text.strip():
                 return text
 

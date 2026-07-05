@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 import os
 import queue
+import subprocess
 import sys
 import threading
 import tkinter as tk
@@ -22,6 +23,7 @@ from tkinter import filedialog, ttk
 
 from .. import __version__
 from ..auth.credentials import load_credentials
+from ..logging_config import setup_logging
 from ..utils import default_credentials_path
 from ..exporter.runner import ExportProgress, ExportResult, export_documents
 
@@ -44,13 +46,13 @@ def _default_output_dir() -> Path:
 
 
 def _open_folder(path: Path) -> None:
-    """Open a folder in the system file explorer."""
+    """Open a folder in the system file explorer (no shell — path is a list arg)."""
     if sys.platform == "win32":
         os.startfile(str(path))
     elif sys.platform == "darwin":
-        os.system(f'open "{path}"')
+        subprocess.run(["open", str(path)], check=False)
     else:
-        os.system(f'xdg-open "{path}"')
+        subprocess.run(["xdg-open", str(path)], check=False)
 
 
 class App:
@@ -342,7 +344,13 @@ class ErrorFrame(ttk.Frame):
 
 
 def main() -> None:
-    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+    # Log to a file in a user-writable location so scheduled/packaged runs leave
+    # a trail (basicConfig was console-only and lost when the window closed).
+    log_dir = Path.home() / ".granola_notes" / "logs"
+    try:
+        setup_logging(log_dir=str(log_dir), verbose=False)
+    except OSError:
+        logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     app = App()
     app.run()
 

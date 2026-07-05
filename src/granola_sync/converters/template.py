@@ -45,7 +45,7 @@ def render_meeting_note(
     if updated.tzinfo is None:
         updated = updated.replace(tzinfo=timezone.utc)
 
-    # Build frontmatter
+    # Build frontmatter — omit empty optional fields to keep YAML clean.
     frontmatter: dict = {
         "type": "meeting",
         "date": date_str,
@@ -53,11 +53,14 @@ def render_meeting_note(
         "source": "granola",
         "granola_id": doc.id,
         "granola_updated": updated.isoformat(),
-        "duration": f"{duration}min" if duration else "",
-        "participants": participants,
-        "projects": projects,
-        "status": "processed",
     }
+    if duration:
+        frontmatter["duration"] = f"{duration}min"
+    if participants:
+        frontmatter["participants"] = participants
+    if projects:
+        frontmatter["projects"] = projects
+    frontmatter["status"] = "processed"
     if tags:
         frontmatter["tags"] = tags
     if meeting_type:
@@ -91,11 +94,11 @@ def render_meeting_note(
             parts.append(f"Meeting participants: {', '.join(participants)}")
         parts.append("")
 
-    # Transcript (embedded in same file)
+    # Transcript (embedded in same file), ordered chronologically.
     if utterances:
         parts.append("Transcript:")
         parts.append("")
-        for u in utterances:
+        for u in sorted(utterances, key=lambda x: x.start_timestamp):
             timestamp = u.start_timestamp.strftime("%H:%M:%S")
             source_label = "You" if u.source == "microphone" else "Speaker"
             parts.append(f"**[{timestamp}]** _{source_label}_: {u.text}")

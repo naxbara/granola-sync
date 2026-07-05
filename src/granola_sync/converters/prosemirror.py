@@ -21,17 +21,20 @@ _MARKDOWN_STRIP_PATTERNS = [
 ]
 
 
+def strip_markdown(md: str) -> str:
+    """Remove Markdown markers (links, bold, italic, heading prefixes)."""
+    for pattern, repl in _MARKDOWN_STRIP_PATTERNS:
+        md = pattern.sub(repl, md)
+    return md
+
+
 def to_plain_text(doc: dict) -> str:
     """Convert a ProseMirror doc to readable plain text (no markdown markers).
 
     Bullet/ordered lists become "- " / "N. " prefixed lines so the structure
     survives in a .txt file readable from Notepad.
     """
-    md = ProseMirrorToMarkdown().convert(doc)
-    plain = md
-    for pattern, repl in _MARKDOWN_STRIP_PATTERNS:
-        plain = pattern.sub(repl, plain)
-    return plain
+    return strip_markdown(ProseMirrorToMarkdown().convert(doc))
 
 
 class ProseMirrorToMarkdown:
