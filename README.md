@@ -147,6 +147,32 @@ enrichment:
   model: "claude-opus-4-8"   # para alto volumen y menor costo: "claude-haiku-4-5"
 ```
 
+## Programación automática
+
+### Windows (Task Scheduler)
+
+Registra una tarea diaria no interactiva (sin `pause`, con logging a archivo):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\install_scheduled_task.ps1 -Time 09:00
+```
+
+- Verificar: `schtasks /query /tn GranolaSyncDaily`
+- Ejecutar ahora: `schtasks /run /tn GranolaSyncDaily`
+- Quitar: `powershell -ExecutionPolicy Bypass -File scripts\install_scheduled_task.ps1 -Uninstall`
+
+### macOS / Linux (cron o launchd)
+
+Los scripts `Granola Sync Diario.sh` / `Semanal.sh` sirven para correr manualmente.
+Para automatizar, una entrada de cron diaria a las 9:00:
+
+```cron
+0 9 * * *  cd /ruta/a/Granolaupdater && /usr/bin/python3 -m granola_sync --mode=daily --config config.yaml
+```
+
+En macOS también puedes usar un `launchd` plist en `~/Library/LaunchAgents/` con
+`StartCalendarInterval` apuntando al mismo comando.
+
 ## Tests
 
 ```bash
