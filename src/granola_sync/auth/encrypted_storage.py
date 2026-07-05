@@ -1,23 +1,21 @@
-"""Decrypt and encrypt Granola's encrypted storage files (Windows).
+"""Decrypt and encrypt Granola's encrypted storage files (Windows + macOS).
 
 Granola 2.x switched to encrypted local storage (supabase.json.enc, etc.).
-The encryption scheme is Electron's safeStorage on Windows:
+The encryption scheme is Electron's safeStorage, OS-specific for the master key:
 
-  Local State.os_crypt.encrypted_key
-    -> base64 decode
-    -> strip "DPAPI" 5-byte prefix
-    -> CryptUnprotectData (DPAPI)
-    -> 32-byte master AES key
+  Windows:
+    Local State.os_crypt.encrypted_key
+      -> base64 decode -> strip "DPAPI" prefix -> CryptUnprotectData -> 32-byte master key
 
-  storage.dek
-    -> "v10" prefix(3) + iv(12) + ciphertext + tag(16)
-    -> AES-256-GCM decrypt with master key
-    -> base64 string -> 32-byte DEK
+  macOS:
+    macOS Keychain (service="Granola Safe Storage", account="Granola Key")
+      -> security find-generic-password -w -> 32-byte master key
 
-  *.enc files
-    -> iv(12) + ciphertext + tag(16)
-    -> AES-256-GCM decrypt with DEK
-    -> JSON utf-8
+  Both platforms share the same DEK + file decryption pipeline:
+    storage.dek  -> "v10"(3) + iv(12) + ciphertext + tag(16)
+                 -> AES-256-GCM decrypt with master key -> base64 string -> 32-byte DEK
+    *.enc files  -> iv(12) + ciphertext + tag(16)
+                 -> AES-256-GCM decrypt with DEK -> JSON utf-8
 
 Constants and format match Granola's app.asar (IV_LEN=12, TAG_LEN=16, DEK_LEN=32).
 """
@@ -34,14 +32,43 @@ TAG_LEN = 16
 DPAPI_PREFIX = b"DPAPI"
 V10_PREFIX = b"v10"
 
+_KEYCHAIN_SERVICE = "Granola Safe Storage"
+_KEYCHAIN_ACCOUNT = "Granola Key"
+
 
 def is_supported() -> bool:
-    """Encrypted storage decryption only supported on Windows."""
-    return sys.platform == "win32"
+    """Encrypted storage decryption is supported on Windows and macOS."""
+    return sys.platform in ("win32", "darwin")
+
+
+def _get_master_key_macos(_granola_dir: Path) -> bytes:
+    """Read the master key from macOS Keychain (Granola Safe Storage)."""
+    import subprocess
+
+    result = subprocess.run(
+        ["security", "find-generic-password",
+         "-s", _KEYCHAIN_SERVICE, "-a", _KEYCHAIN_ACCOUNT, "-w"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    key_str = result.stdout.strip()
+    # Keychain returns the key as a string; try base64-decode to 32 raw bytes first.
+    try:
+        decoded = base64.b64decode(key_str)
+        if len(decoded) == 32:
+            return decoded
+    except Exception:
+        pass
+    return key_str.encode("utf-8")
 
 
 def _get_master_key(granola_dir: Path) -> bytes:
-    """Decrypt the OS-bound master key from Local State."""
+    """Return the OS-bound 32-byte master AES key."""
+    if sys.platform == "darwin":
+        return _get_master_key_macos(granola_dir)
+
+    # Windows: read from Local State via DPAPI
     import win32crypt
 
     local_state = json.loads((granola_dir / "Local State").read_text(encoding="utf-8"))
@@ -70,7 +97,7 @@ def _get_dek(granola_dir: Path, master_key: bytes) -> bytes:
 def get_dek(granola_dir: Path) -> bytes:
     """Return the 32-byte AES DEK used to encrypt Granola's *.enc files."""
     if not is_supported():
-        raise RuntimeError("Encrypted Granola storage is only supported on Windows")
+        raise RuntimeError("Encrypted Granola storage is only supported on Windows and macOS")
     master_key = _get_master_key(granola_dir)
     return _get_dek(granola_dir, master_key)
 

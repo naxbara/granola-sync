@@ -1,6 +1,6 @@
 """Render a Granola document + transcript as a plain-text file.
 
-The format targets non-technical users opening the .txt in Notepad or Word:
+The format targets non-technical users opening the .txt in Notepad/TextEdit/Word:
   - Title banner with `=` underline
   - Metadata block (date, duration, participants)
   - SUMMARY section with the AI-generated summary
@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import html
 import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -205,11 +206,13 @@ def write_document(
 ) -> Path:
     """Write the rendered .txt to out_dir and return the file path.
 
-    Uses UTF-8 with BOM so Windows Notepad and Word render accents correctly.
+    Windows uses UTF-8-with-BOM so Notepad and Word render accents correctly.
+    macOS and Linux use plain UTF-8 (no BOM needed).
     """
     out_dir.mkdir(parents=True, exist_ok=True)
     date_str = doc.meeting_date.strftime("%Y-%m-%d")
     filename = generate_txt_filename(doc.title, date_str)
     path = out_dir / filename
-    path.write_text(format_document(doc, transcript), encoding="utf-8-sig")
+    encoding = "utf-8-sig" if sys.platform == "win32" else "utf-8"
+    path.write_text(format_document(doc, transcript), encoding=encoding)
     return path

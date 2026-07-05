@@ -30,6 +30,9 @@ APP_TITLE = "Granola → Carpeta de Notas"
 APP_VERSION = "1.0"
 DEFAULT_OUTPUT_NAME = "Granola Notes"
 
+_FONT_UI = "SF Pro Display" if sys.platform == "darwin" else "Segoe UI"
+_FONT_MONO = "Menlo" if sys.platform == "darwin" else "Consolas"
+
 
 def _default_output_dir() -> Path:
     """`~/Documents/Granola Notes` — falls back to home if Documents is missing."""
@@ -162,7 +165,7 @@ class ConfigFrame(ttk.Frame):
 
     def _build(self) -> None:
         ttk.Label(
-            self, text="Exportar reuniones de Granola", font=("Segoe UI", 14, "bold")
+            self, text="Exportar reuniones de Granola", font=(_FONT_UI, 14, "bold")
         ).pack(anchor="w")
         ttk.Label(
             self,
@@ -201,7 +204,7 @@ class ConfigFrame(ttk.Frame):
             self,
             text=f"Granola Notes v{APP_VERSION}",
             foreground="#999",
-            font=("Segoe UI", 8),
+            font=(_FONT_UI, 8),
         ).pack(side="bottom", anchor="e", pady=(20, 0))
 
     def _pick_folder(self) -> None:
@@ -222,7 +225,7 @@ class ProgressFrame(ttk.Frame):
         self._build()
 
     def _build(self) -> None:
-        ttk.Label(self, text="Exportando reuniones…", font=("Segoe UI", 14, "bold")).pack(
+        ttk.Label(self, text="Exportando reuniones…", font=(_FONT_UI, 14, "bold")).pack(
             anchor="w", pady=(0, 12)
         )
         self.progress = ttk.Progressbar(self, mode="determinate", length=480)
@@ -248,19 +251,19 @@ class ResultFrame(ttk.Frame):
         self._build()
 
     def _build(self) -> None:
-        ttk.Label(self, text="✔ Listo", font=("Segoe UI", 16, "bold"), foreground="#2a7a2a").pack(
+        ttk.Label(self, text="✔ Listo", font=(_FONT_UI, 16, "bold"), foreground="#2a7a2a").pack(
             anchor="w", pady=(0, 8)
         )
 
         msg = f"Se exportaron {self.result.written} reuniones."
         if self.result.errors:
             msg += f"  ({self.result.errors} con errores)"
-        ttk.Label(self, text=msg, font=("Segoe UI", 11)).pack(anchor="w", pady=(0, 16))
+        ttk.Label(self, text=msg, font=(_FONT_UI, 11)).pack(anchor="w", pady=(0, 16))
 
         ttk.Label(self, text="📁 Tus archivos están en:", foreground="#555").pack(anchor="w")
         path_frame = ttk.Frame(self, padding=(8, 6), relief="solid", borderwidth=1)
         path_frame.pack(fill="x", pady=(2, 14))
-        ttk.Label(path_frame, text=str(self.result.output_dir), font=("Consolas", 10)).pack(
+        ttk.Label(path_frame, text=str(self.result.output_dir), font=(_FONT_MONO, 10)).pack(
             anchor="w"
         )
 
@@ -273,14 +276,17 @@ class ResultFrame(ttk.Frame):
             side="left", ipadx=10, ipady=4
         )
 
+        _editor_tip = (
+            "Tip: cada archivo .txt se abre con TextEdit o cualquier editor de texto."
+            if sys.platform == "darwin" else
+            "Tip: cada archivo .txt se abre con el Bloc de notas o Word. "
+            "Si no ves los acentos correctamente, abre con Word o Bloc de notas (UTF-8)."
+        )
         ttk.Label(
             self,
-            text=(
-                "Tip: cada archivo .txt se abre con el Bloc de notas o Word. "
-                "Si no ves los acentos correctamente, abre con Word o Bloc de notas (UTF-8)."
-            ),
+            text=_editor_tip,
             foreground="#777",
-            font=("Segoe UI", 9),
+            font=(_FONT_UI, 9),
             wraplength=500,
         ).pack(anchor="w", pady=(20, 0))
 
@@ -300,7 +306,7 @@ class ErrorFrame(ttk.Frame):
 
     def _build(self) -> None:
         ttk.Label(
-            self, text="⚠ No pude conectarme a Granola", font=("Segoe UI", 14, "bold")
+            self, text="⚠ No pude conectarme a Granola", font=(_FONT_UI, 14, "bold")
         ).pack(anchor="w", pady=(0, 12))
         ttk.Label(
             self,
