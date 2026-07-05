@@ -13,6 +13,10 @@ logs/
 # Config with secrets
 config.yaml
 
+# Diagnostic API dumps (may contain real meeting data)
+scripts/api_dump.json
+**/api_dump.json
+
 # OS
 .DS_Store
 Thumbs.db
