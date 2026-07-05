@@ -156,10 +156,14 @@ enrichment:
 
 ### Windows (Task Scheduler)
 
-Registra una tarea diaria no interactiva (sin `pause`, con logging a archivo):
+Registra una tarea diaria no interactiva (sin `pause`, con logging a archivo).
+Usa una **ventana móvil** (por defecto 3 días) para que un día saltado se recupere
+en la siguiente corrida — gratis gracias al dedup + la actualización de notas:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\install_scheduled_task.ps1 -Time 09:00
+# Ventana más ancha (ej. 7 días) como red de seguridad extra:
+powershell -ExecutionPolicy Bypass -File scripts\install_scheduled_task.ps1 -Time 09:00 -Window 7
 ```
 
 - Verificar: `schtasks /query /tn GranolaSyncDaily`

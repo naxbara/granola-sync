@@ -555,10 +555,10 @@ logging:
       <h2>Programar la sincronización automática</h2>
       <p>Para que corra sola cada día sin que la ejecutes a mano.</p>
       <h3>Windows &mdash; Programador de tareas</h3>
-      <p>Un instalador registra una tarea diaria no interactiva (sin ventana ni pausa, con registro a archivo):</p>
+      <p>Un instalador registra una tarea diaria no interactiva (sin ventana ni pausa, con registro a archivo). Usa una <strong>ventana móvil</strong> (3 días por defecto) para que un día saltado se recupere en la siguiente corrida &mdash; gratis gracias al dedup y la actualización de notas.</p>
       <div class="term">
         <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">PowerShell</span><button class="copy" type="button">copiar</button></div>
-<pre><span class="cm"># Registrar la tarea diaria a las 9:00</span>
+<pre><span class="cm"># Registrar la tarea diaria a las 9:00 (ventana móvil, 3 días por defecto)</span>
 <span class="pr">&gt;</span> powershell -ExecutionPolicy Bypass -File scripts\install_scheduled_task.ps1 <span class="fl">-Time</span> 09:00
 
 <span class="cm"># Verificar / ejecutar ahora / quitar</span>
