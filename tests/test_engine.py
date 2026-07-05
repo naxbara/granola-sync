@@ -112,6 +112,12 @@ def test_dry_run_makes_no_api_calls_or_writes(tmp_path: Path):
     assert not (tmp_path / "Reuniones").exists()  # nothing written
 
 
+def test_document_tolerates_null_title():
+    now = datetime.now(UTC)
+    doc = GranolaDocument(id="d1", title=None, created_at=now, updated_at=now)
+    assert doc.title == ""
+
+
 def test_daily_skips_docs_older_than_24h(tmp_path: Path):
     old = datetime(2020, 1, 1, tzinfo=UTC)
     doc = _doc("d1", created=old, updated=old)

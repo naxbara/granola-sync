@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class ProseMirrorMark(BaseModel):
@@ -82,6 +82,12 @@ class GranolaDocument(BaseModel):
     last_viewed_panel: DocumentPanel | None = None
 
     model_config = {"populate_by_name": True, "extra": "ignore"}
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _title_not_none(cls, v: object) -> str:
+        # The API sometimes returns an explicit null title; coerce to "".
+        return v if isinstance(v, str) else ""
 
     @property
     def meeting_date(self) -> datetime:
