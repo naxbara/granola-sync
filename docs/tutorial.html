@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tutorial · Granola Sync 1.0</title>
+<style>
+  :root {
+    --paper:   #FBFAF6;
+    --surface: #FFFFFF;
+    --sunk:    #F3F1EA;
+    --ink:     #1B1E19;
+    --ink-soft:#565B4F;
+    --ink-faint:#8A8E80;
+    --line:    #E5E2D8;
+    --line-strong:#D6D2C5;
+    --accent:  #2F6B43;
+    --accent-ink:#255737;
+    --accent-soft:#E7F0E9;
+    --honey:   #9A6a15;
+    --honey-soft:#F6EDD8;
+    --danger:  #9d3327;
+    --danger-soft:#F6E4E0;
+
+    --term-bg: #171A14;
+    --term-ink:#E6E7DB;
+    --term-soft:#8f947f;
+    --term-green:#8FD1A2;
+    --term-honey:#E3B96A;
+
+    --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "JetBrains Mono", Consolas, "Liberation Mono", monospace;
+
+    --maxw: 1120px;
+    --read: 46rem;
+    --radius: 10px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:   #14150F;
+      --surface: #1C1E16;
+      --sunk:    #22241A;
+      --ink:     #ECEDE1;
+      --ink-soft:#A7AB99;
+      --ink-faint:#787C6C;
+      --line:    #2E3125;
+      --line-strong:#3A3D2F;
+      --accent:  #7FBE93;
+      --accent-ink:#9AD1AC;
+      --accent-soft:#20301F;
+      --honey:   #D8AC5A;
+      --honey-soft:#2A2417;
+      --danger:  #E08B7C;
+      --danger-soft:#2E1E1A;
+      --term-bg: #101109;
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:#14150F; --surface:#1C1E16; --sunk:#22241A; --ink:#ECEDE1;
+    --ink-soft:#A7AB99; --ink-faint:#787C6C; --line:#2E3125; --line-strong:#3A3D2F;
+    --accent:#7FBE93; --accent-ink:#9AD1AC; --accent-soft:#20301F;
+    --honey:#D8AC5A; --honey-soft:#2A2417; --danger:#E08B7C; --danger-soft:#2E1E1A;
+    --term-bg:#101109;
+  }
+  :root[data-theme="light"] {
+    --paper:#FBFAF6; --surface:#FFFFFF; --sunk:#F3F1EA; --ink:#1B1E19;
+    --ink-soft:#565B4F; --ink-faint:#8A8E80; --line:#E5E2D8; --line-strong:#D6D2C5;
+    --accent:#2F6B43; --accent-ink:#255737; --accent-soft:#E7F0E9;
+    --honey:#9A6A15; --honey-soft:#F6EDD8; --danger:#9d3327; --danger-soft:#F6E4E0;
+    --term-bg:#171A14;
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 17px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .eyebrow {
+    font-family: var(--font-mono);
+    font-size: .72rem;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0;
+  }
+
+  a { color: var(--accent-ink); text-decoration-color: color-mix(in srgb, var(--accent) 40%, transparent); text-underline-offset: 3px; }
+  a:hover { text-decoration-color: var(--accent); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 3px; }
+
+  /* ---------- header band ---------- */
+  .band {
+    border-bottom: 1px solid var(--line);
+    background:
+      radial-gradient(120% 140% at 88% -20%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 60%),
+      var(--surface);
+  }
+  .band-inner {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 54px 28px 44px;
+  }
+  .brand { display: flex; align-items: center; gap: 13px; margin-bottom: 30px; }
+  .mark {
+    width: 40px; height: 40px; flex: 0 0 auto;
+    border-radius: 11px;
+    background: var(--accent);
+    display: grid; place-items: center;
+    box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 8%, transparent);
+  }
+  .mark svg { width: 23px; height: 23px; display: block; }
+  .brand-name { font-family: var(--font-mono); font-weight: 600; font-size: .95rem; letter-spacing: -.01em; }
+  .brand-name b { color: var(--accent-ink); }
+  .ver {
+    margin-left: auto;
+    font-family: var(--font-mono); font-size: .74rem;
+    color: var(--ink-soft);
+    border: 1px solid var(--line-strong); border-radius: 999px;
+    padding: 4px 11px;
+  }
+  h1.title {
+    font-size: clamp(2.1rem, 5.2vw, 3.15rem);
+    line-height: 1.04;
+    letter-spacing: -.028em;
+    font-weight: 720;
+    margin: 0 0 16px;
+    max-width: 20ch;
+    text-wrap: balance;
+  }
+  .lede {
+    font-size: clamp(1.05rem, 2.2vw, 1.22rem);
+    color: var(--ink-soft);
+    max-width: 52ch;
+    margin: 0 0 26px;
+  }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    font-family: var(--font-mono); font-size: .76rem;
+    background: var(--sunk); border: 1px solid var(--line);
+    color: var(--ink-soft);
+    padding: 5px 10px; border-radius: 7px;
+  }
+  .chip b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- layout ---------- */
+  .shell {
+    max-width: var(--maxw);
+    margin: 0 auto;
+    padding: 0 28px 90px;
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr);
+    gap: 56px;
+    align-items: start;
+  }
+  nav.toc {
+    position: sticky; top: 0;
+    padding-top: 48px;
+    align-self: start;
+    max-height: 100vh; overflow-y: auto;
+  }
+  nav.toc .eyebrow { margin-bottom: 14px; }
+  nav.toc ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; counter-reset: toc; }
+  nav.toc a {
+    display: block;
+    font-size: .88rem;
+    color: var(--ink-soft);
+    text-decoration: none;
+    padding: 5px 10px 5px 12px;
+    border-left: 2px solid var(--line);
+    line-height: 1.35;
+  }
+  nav.toc a:hover { color: var(--ink); border-left-color: var(--line-strong); background: color-mix(in srgb, var(--sunk) 60%, transparent); }
+  nav.toc a.active { color: var(--accent-ink); border-left-color: var(--accent); font-weight: 600; }
+
+  main { padding-top: 48px; min-width: 0; }
+  section { scroll-margin-top: 24px; margin-bottom: 60px; }
+  section > .eyebrow { margin-bottom: 8px; }
+  h2 {
+    font-size: 1.62rem; letter-spacing: -.02em; font-weight: 680;
+    margin: 0 0 14px; line-height: 1.15; text-wrap: balance;
+  }
+  h3 {
+    font-size: 1.08rem; letter-spacing: -.005em; font-weight: 660;
+    margin: 30px 0 10px;
+  }
+  p { max-width: var(--read); margin: 0 0 15px; }
+  main ul, main ol.steps { max-width: var(--read); padding-left: 1.15em; margin: 0 0 16px; }
+  main li { margin: 6px 0; }
+  main li::marker { color: var(--accent); }
+  code.inl {
+    font-family: var(--font-mono); font-size: .86em;
+    background: var(--sunk); border: 1px solid var(--line);
+    padding: .08em .38em; border-radius: 5px; white-space: nowrap;
+  }
+  .hr { height: 1px; background: var(--line); border: 0; margin: 0 0 34px; max-width: var(--read); }
+
+  /* ---------- what's new grid ---------- */
+  .newgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: 14px; margin: 6px 0 4px; }
+  .feat {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 17px 17px 16px;
+    display: flex; flex-direction: column; gap: 7px;
+    transition: border-color .16s ease, transform .16s ease;
+  }
+  @media (prefers-reduced-motion: no-preference) { .feat:hover { border-color: var(--line-strong); transform: translateY(-2px); } }
+  .feat .ft { display: flex; align-items: center; gap: 8px; }
+  .feat h4 { margin: 0; font-size: .98rem; font-weight: 640; letter-spacing: -.01em; }
+  .feat p { margin: 0; font-size: .88rem; color: var(--ink-soft); max-width: none; line-height: 1.5; }
+  .tag {
+    font-family: var(--font-mono); font-size: .62rem; letter-spacing: .08em; text-transform: uppercase;
+    color: var(--accent-ink); background: var(--accent-soft);
+    padding: 2px 6px; border-radius: 5px; font-weight: 600;
+    border: 1px solid color-mix(in srgb, var(--accent) 26%, transparent);
+  }
+  .tag.fix { color: var(--honey); background: var(--honey-soft); border-color: color-mix(in srgb, var(--honey) 30%, transparent); }
+
+  /* ---------- terminal ---------- */
+  .term {
+    background: var(--term-bg); color: var(--term-ink);
+    border-radius: var(--radius); border: 1px solid color-mix(in srgb, #000 30%, var(--term-bg));
+    margin: 0 0 18px; overflow: hidden; max-width: var(--read);
+    box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 10%, transparent);
+  }
+  .term-bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 9px 13px; border-bottom: 1px solid rgba(255,255,255,.07);
+  }
+  .term-dot { width: 10px; height: 10px; border-radius: 50%; background: rgba(255,255,255,.16); }
+  .term-title { font-family: var(--font-mono); font-size: .72rem; color: var(--term-soft); margin-left: 4px; letter-spacing: .02em; }
+  .copy {
+    margin-left: auto; font-family: var(--font-mono); font-size: .68rem;
+    color: var(--term-soft); background: rgba(255,255,255,.06);
+    border: 1px solid rgba(255,255,255,.1); border-radius: 6px;
+    padding: 3px 9px; cursor: pointer; letter-spacing: .04em;
+  }
+  .copy:hover { color: var(--term-ink); background: rgba(255,255,255,.12); }
+  .copy.ok { color: var(--term-green); }
+  .term pre {
+    margin: 0; padding: 15px 16px;
+    font-family: var(--font-mono); font-size: .83rem; line-height: 1.7;
+    overflow-x: auto; white-space: pre;
+  }
+  .term .pr { color: var(--term-green); user-select: none; }
+  .term .cm { color: var(--term-soft); }
+  .term .fl { color: #9BD0E6; }
+
+  /* ---------- callouts ---------- */
+  .call {
+    border: 1px solid var(--line); border-left: 3px solid var(--accent);
+    background: var(--surface); border-radius: 9px;
+    padding: 14px 16px 13px; margin: 0 0 18px; max-width: var(--read);
+    display: flex; gap: 12px;
+  }
+  .call .ic { flex: 0 0 auto; width: 20px; height: 20px; margin-top: 1px; color: var(--accent); }
+  .call .bd { min-width: 0; }
+  .call .bd > *:last-child { margin-bottom: 0; }
+  .call .lb { font-family: var(--font-mono); font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; color: var(--accent-ink); font-weight: 600; display: block; margin-bottom: 3px; }
+  .call p { font-size: .92rem; color: var(--ink-soft); }
+  .call.money { border-left-color: var(--honey); }
+  .call.money .ic { color: var(--honey); }
+  .call.money .lb { color: var(--honey); }
+  .call.warn { border-left-color: var(--danger); }
+  .call.warn .ic, .call.warn .lb { color: var(--danger); }
+
+  /* ---------- tables ---------- */
+  .tbl-wrap { overflow-x: auto; max-width: var(--read); margin: 0 0 18px; border: 1px solid var(--line); border-radius: var(--radius); }
+  table { border-collapse: collapse; width: 100%; font-size: .88rem; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th { background: var(--sunk); font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-soft); font-weight: 600; }
+  tbody tr:last-child td { border-bottom: 0; }
+  td code, th code { font-family: var(--font-mono); font-size: .82em; color: var(--accent-ink); white-space: nowrap; }
+  td.d { color: var(--ink-soft); }
+
+  /* ---------- mode cards ---------- */
+  .modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px,1fr)); gap: 14px; max-width: var(--read); margin-bottom: 6px; }
+  .mode { border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; background: var(--surface); }
+  .mode kbd {
+    font-family: var(--font-mono); font-size: .78rem; font-weight: 600;
+    color: var(--accent-ink); background: var(--accent-soft);
+    border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
+    padding: 3px 8px; border-radius: 6px; display: inline-block; margin-bottom: 9px;
+  }
+  .mode p { font-size: .9rem; color: var(--ink-soft); margin: 0; max-width: none; }
+
+  /* ---------- footer ---------- */
+  footer {
+    border-top: 1px solid var(--line);
+    max-width: var(--maxw); margin: 0 auto; padding: 30px 28px 60px;
+    color: var(--ink-faint); font-size: .84rem;
+    display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center;
+  }
+  footer .eyebrow { color: var(--ink-faint); }
+
+  @media (max-width: 900px) {
+    .shell { grid-template-columns: 1fr; gap: 0; }
+    nav.toc { display: none; }
+    main { padding-top: 34px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="band">
+  <div class="band-inner">
+    <div class="brand">
+      <span class="mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 8a8 8 0 0 1 14-3l2 2"/><path d="M20 5v4h-4"/>
+          <path d="M20 16a8 8 0 0 1-14 3l-2-2"/><path d="M4 19v-4h4"/>
+        </svg>
+      </span>
+      <span class="brand-name">granola<b>-sync</b></span>
+      <span class="ver">v1.0.0</span>
+    </div>
+    <p class="eyebrow">Tutorial completo</p>
+    <h1 class="title">Tus reuniones de Granola, ordenadas en Obsidian.</h1>
+    <p class="lede">Una herramienta que sincroniza automáticamente las notas de tus reuniones de Granola hacia tu vault de Obsidian &mdash; con detección de duplicados, actualización de notas modificadas y enriquecimiento con IA. Esta es la guía de la versión 1.0, con todo lo nuevo y cómo usarla.</p>
+    <div class="meta-row">
+      <span class="chip"><b>Python</b> 3.11+</span>
+      <span class="chip"><b>Windows</b> · macOS</span>
+      <span class="chip">CLI + app con ventana</span>
+      <span class="chip">Sincroniza a <b>Obsidian</b></span>
+    </div>
+  </div>
+</div>
+
+<div class="shell">
+  <nav class="toc" aria-label="Contenido">
+    <p class="eyebrow">En esta guía</p>
+    <ol>
+      <li><a href="#que-es">Qué es</a></li>
+      <li><a href="#nuevo">Qué cambió en la 1.0</a></li>
+      <li><a href="#instalar">1 · Instalar</a></li>
+      <li><a href="#configurar">2 · Configurar</a></li>
+      <li><a href="#usar">3 · Los 4 modos</a></li>
+      <li><a href="#flags">4 · Opciones (flags)</a></li>
+      <li><a href="#programar">5 · Programar automático</a></li>
+      <li><a href="#exportar">6 · Exportar a .txt</a></li>
+      <li><a href="#enrichment">7 · Enrichment con IA</a></li>
+      <li><a href="#referencia">Referencia rápida</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <!-- QUE ES -->
+    <section id="que-es">
+      <p class="eyebrow">Panorama</p>
+      <h2>Qué hace, en una frase</h2>
+      <p>Cada vez que la ejecutas, <code class="inl">granola-sync</code> lee tus reuniones desde la app de Granola, las convierte a Markdown y las guarda como notas en tu vault de Obsidian &mdash; una nota por reunión, con su resumen, participantes y transcripción. Detecta lo que ya sincronizaste para no duplicar, y si editaste una reunión en Granola, actualiza la nota existente.</p>
+      <p>Hay <strong>dos formas de usarla</strong>, según quién seas:</p>
+      <ul>
+        <li><strong>Línea de comandos</strong> (<code class="inl">granola-sync</code>) &mdash; el flujo completo hacia Obsidian, ideal para dejar corriendo automático.</li>
+        <li><strong>App con ventana</strong> (<code class="inl">granola-notes-gui</code>) &mdash; para personas no técnicas: exporta un archivo <code class="inl">.txt</code> por reunión, sin tocar la terminal.</li>
+      </ul>
+    </section>
+
+    <!-- NUEVO -->
+    <section id="nuevo">
+      <p class="eyebrow">Novedades</p>
+      <h2>Qué cambió en la versión 1.0</h2>
+      <p>Esta versión endurece la herramienta para que corra sola sin fallar en silencio, y agrega dos cosas que faltaban: que las notas modificadas se re-sincronicen, y que el <em>dry-run</em> no cueste dinero.</p>
+      <div class="newgrid">
+        <div class="feat">
+          <div class="ft"><h4>Notas que se actualizan</h4><span class="tag">Nuevo</span></div>
+          <p>Si editas una reunión en Granola, la nota en Obsidian ahora se regenera. Antes se creaba una vez y nunca cambiaba.</p>
+        </div>
+        <div class="feat">
+          <div class="ft"><h4>Dry-run gratis</h4><span class="tag">Nuevo</span></div>
+          <p><code class="inl">--mode=dry-run</code> ya no descarga detalle ni llama a la IA: solo te muestra qué haría, sin gastar.</p>
+        </div>
+        <div class="feat">
+          <div class="ft"><h4>Reintentos de red</h4><span class="tag">Nuevo</span></div>
+          <p>Ante un 429/500 o un corte, reintenta con espera progresiva en vez de abortar todo el sync.</p>
+        </div>
+        <div class="feat">
+          <div class="ft"><h4>Sesión que se renueva</h4><span class="tag">Nuevo</span></div>
+          <p>Si el token expira (error 401), fuerza una renovación y reintenta una vez, sin intervención tuya.</p>
+        </div>
+        <div class="feat">
+          <div class="ft"><h4>Enrichment reparado</h4><span class="tag fix">Arreglado</span></div>
+          <p>El modelo de IA por defecto estaba descontinuado y fallaba en silencio. Ahora usa uno vigente y avisa si algo falla.</p>
+        </div>
+        <div class="feat">
+          <div class="ft"><h4>Carpeta configurable</h4><span class="tag">Nuevo</span></div>
+          <p><code class="inl">sync.notes_folder</code> decide en qué subcarpeta del vault caen las notas (por defecto <code class="inl">Reuniones</code>).</p>
+        </div>
+        <div class="feat">
+          <div class="ft"><h4>Verificación más estricta</h4><span class="tag">Nuevo</span></div>
+          <p><code class="inl">--mode=verify</code> ahora detecta notas con cuerpo vacío, no solo archivos cortos.</p>
+        </div>
+        <div class="feat">
+          <div class="ft"><h4>Tarea programada (Windows)</h4><span class="tag">Nuevo</span></div>
+          <p>Un instalador de PowerShell registra la sincronización diaria automática, sin ventanas ni pausas.</p>
+        </div>
+        <div class="feat">
+          <div class="ft"><h4>Soporte macOS</h4><span class="tag">Nuevo</span></div>
+          <p>La app con ventana ahora corre en Mac (lee las credenciales desde el Llavero) además de Windows.</p>
+        </div>
+        <div class="feat">
+          <div class="ft"><h4>Errores claros</h4><span class="tag fix">Arreglado</span></div>
+          <p>Un problema de red o de sesión ahora muestra un mensaje que dice qué hacer, no un error técnico crudo.</p>
+        </div>
+        <div class="feat">
+          <div class="ft"><h4>Menos llamadas a la API</h4><span class="tag">Nuevo</span></div>
+          <p>Descarga el contenido de todas las notas nuevas en pocas llamadas agrupadas, no una por reunión.</p>
+        </div>
+        <div class="feat">
+          <div class="ft"><h4>Limpieza de datos</h4><span class="tag fix">Arreglado</span></div>
+          <p>Se sacó del repositorio un volcado con contenido real de reuniones, y los logs viejos se borran solos.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- INSTALAR -->
+    <section id="instalar">
+      <p class="eyebrow">Paso 1</p>
+      <h2>Instalar</h2>
+      <p>Necesitas <strong>Python 3.11 o superior</strong>, la app de escritorio de Granola instalada y con sesión iniciada al menos una vez, y un vault de Obsidian.</p>
+      <div class="term">
+        <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">terminal</span><button class="copy" type="button">copiar</button></div>
+<pre><span class="pr">$</span> git clone https://github.com/naxbara/Granolaupdater.git
+<span class="pr">$</span> cd Granolaupdater
+<span class="pr">$</span> pip install -e ".[dev]"</pre>
+      </div>
+      <p>Eso deja disponibles dos comandos: <code class="inl">granola-sync</code> (la sincronización a Obsidian) y <code class="inl">granola-notes-gui</code> (la app con ventana).</p>
+    </section>
+
+    <!-- CONFIGURAR -->
+    <section id="configurar">
+      <p class="eyebrow">Paso 2</p>
+      <h2>Configurar</h2>
+      <p>Copia el archivo de ejemplo a <code class="inl">config.yaml</code> y edítalo con la ruta de tu vault. Las credenciales de Granola se detectan solas desde la app; no las pones aquí.</p>
+      <div class="term">
+        <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">terminal</span><button class="copy" type="button">copiar</button></div>
+<pre><span class="pr">$</span> cp config.example.yaml config.yaml</pre>
+      </div>
+      <div class="term">
+        <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">config.yaml</span><button class="copy" type="button">copiar</button></div>
+<pre>vault_path: <span class="cm">"C:\\Users\\TuNombre\\...\\ObsidianVault"</span>
+
+sync:
+  include_transcripts: true
+  fuzzy_threshold: 85        <span class="cm"># 0-100, similitud de títulos</span>
+  notes_folder: <span class="cm">"Reuniones"</span>    <span class="cm"># subcarpeta destino</span>
+
+enrichment:
+  enabled: false            <span class="cm"># ver sección 7</span>
+  api_key: <span class="cm">"sk-ant-..."</span>
+  model: <span class="cm">"claude-opus-4-8"</span>
+
+logging:
+  dir: <span class="cm">"logs"</span>
+  verbose: false</pre>
+      </div>
+      <p>Todas las claves con su significado:</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Clave</th><th>Qué controla</th></tr></thead>
+          <tbody>
+            <tr><td><code>vault_path</code></td><td class="d">Ruta a la raíz de tu vault de Obsidian. La única obligatoria.</td></tr>
+            <tr><td><code>sync.include_transcripts</code></td><td class="d">Si incrusta la transcripción completa dentro de cada nota.</td></tr>
+            <tr><td><code>sync.fuzzy_threshold</code></td><td class="d">Qué tan parecido debe ser un título (misma fecha) para considerarse duplicado. 85 = 85%.</td></tr>
+            <tr><td><code>sync.notes_folder</code></td><td class="d">Subcarpeta del vault donde se guardan las notas. Por defecto <code>Reuniones</code>.</td></tr>
+            <tr><td><code>enrichment.enabled</code></td><td class="d">Activa la clasificación con IA vía API paga de Anthropic (ver sección 7).</td></tr>
+            <tr><td><code>enrichment.api_key</code></td><td class="d">Tu API key de Anthropic (solo si activas enrichment por API).</td></tr>
+            <tr><td><code>enrichment.model</code></td><td class="d">Modelo a usar. <code>claude-opus-4-8</code>, o <code>claude-haiku-4-5</code> para menor costo.</td></tr>
+            <tr><td><code>logging.dir</code></td><td class="d">Carpeta de logs. Si es relativa, cae junto al <code>config.yaml</code>.</td></tr>
+            <tr><td><code>logging.verbose</code></td><td class="d">Registro detallado (nivel DEBUG).</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="call">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16v-4"/><path d="M12 8h.01"/><circle cx="12" cy="12" r="9"/></svg>
+        <div class="bd"><span class="lb">Credenciales</span><p>No pones usuario ni contraseña de Granola. La herramienta las lee automáticamente desde la app: en Windows de <code class="inl">%APPDATA%\Granola</code>, en macOS del Llavero. Solo necesitas haber iniciado sesión en Granola alguna vez.</p></div>
+      </div>
+    </section>
+
+    <!-- USAR -->
+    <section id="usar">
+      <p class="eyebrow">Paso 3</p>
+      <h2>Los cuatro modos</h2>
+      <p>La sincronización tiene cuatro modos. El de por defecto es <code class="inl">daily</code>, pensado para correr todos los días.</p>
+      <div class="modes">
+        <div class="mode"><kbd>daily</kbd><p>Sincroniza las reuniones de las últimas 24 horas. Es el modo por defecto.</p></div>
+        <div class="mode"><kbd>historical</kbd><p>Importa todo desde una fecha. Úsalo la primera vez o para rellenar hacia atrás.</p></div>
+        <div class="mode"><kbd>verify</kbd><p>Revisa la integridad de las notas ya sincronizadas: archivos faltantes o cuerpo vacío.</p></div>
+        <div class="mode"><kbd>dry-run</kbd><p>Muestra qué crearía o actualizaría, sin escribir nada y sin gastar en API.</p></div>
+      </div>
+      <div class="term">
+        <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">terminal</span><button class="copy" type="button">copiar</button></div>
+<pre><span class="cm"># Sync de las últimas 24h (modo por defecto)</span>
+<span class="pr">$</span> granola-sync
+
+<span class="cm"># Primera importación: todo desde una fecha</span>
+<span class="pr">$</span> granola-sync <span class="fl">--mode</span>=historical <span class="fl">--from</span>=2026-01-01
+
+<span class="cm"># Ver qué haría, sin escribir ni gastar</span>
+<span class="pr">$</span> granola-sync <span class="fl">--mode</span>=dry-run
+
+<span class="cm"># Revisar integridad de las notas existentes</span>
+<span class="pr">$</span> granola-sync <span class="fl">--mode</span>=verify</pre>
+      </div>
+      <div class="call">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 12 2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg>
+        <div class="bd"><span class="lb">Recomendación</span><p>La primera vez corre <code class="inl">--mode=dry-run</code> para ver cuántas notas detecta sin tocar el vault. Luego <code class="inl">--mode=historical --from=&lt;fecha&gt;</code> para la carga inicial, y de ahí en adelante <code class="inl">daily</code> (idealmente programado, sección 5).</p></div>
+      </div>
+      <h3>Cómo decide crear, actualizar o saltar</h3>
+      <ul>
+        <li><strong>Salta</strong> si la reunión ya tiene nota (por su <code class="inl">granola_id</code>, o por título muy parecido en la misma fecha).</li>
+        <li><strong>Actualiza</strong> la nota existente si editaste esa reunión en Granola después de la última sincronización.</li>
+        <li><strong>Crea</strong> una nota nueva si la reunión no existe todavía en el vault.</li>
+      </ul>
+    </section>
+
+    <!-- FLAGS -->
+    <section id="flags">
+      <p class="eyebrow">Paso 4</p>
+      <h2>Opciones de línea de comandos</h2>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Opción</th><th>Efecto</th></tr></thead>
+          <tbody>
+            <tr><td><code>--mode=&lt;m&gt;</code></td><td class="d"><code>daily</code> · <code>historical</code> · <code>verify</code> · <code>dry-run</code>. Por defecto <code>daily</code>.</td></tr>
+            <tr><td><code>--from=&lt;fecha&gt;</code></td><td class="d">Fecha de inicio para el modo <code>historical</code> (formato <code>YYYY-MM-DD</code>).</td></tr>
+            <tr><td><code>--config=&lt;ruta&gt;</code></td><td class="d">Usar un archivo de configuración distinto a <code>config.yaml</code>.</td></tr>
+            <tr><td><code>--vault=&lt;ruta&gt;</code></td><td class="d">Sobrescribir la ruta del vault sin editar el config.</td></tr>
+            <tr><td><code>--no-enrich</code></td><td class="d">Saltar el enrichment con IA en esta corrida.</td></tr>
+            <tr><td><code>--verbose</code> · <code>-v</code></td><td class="d">Registro detallado en consola y en el archivo de log.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- PROGRAMAR -->
+    <section id="programar">
+      <p class="eyebrow">Paso 5</p>
+      <h2>Programar la sincronización automática</h2>
+      <p>Para que corra sola cada día sin que la ejecutes a mano.</p>
+      <h3>Windows &mdash; Programador de tareas</h3>
+      <p>Un instalador registra una tarea diaria no interactiva (sin ventana ni pausa, con registro a archivo):</p>
+      <div class="term">
+        <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">PowerShell</span><button class="copy" type="button">copiar</button></div>
+<pre><span class="cm"># Registrar la tarea diaria a las 9:00</span>
+<span class="pr">&gt;</span> powershell -ExecutionPolicy Bypass -File scripts\install_scheduled_task.ps1 <span class="fl">-Time</span> 09:00
+
+<span class="cm"># Verificar / ejecutar ahora / quitar</span>
+<span class="pr">&gt;</span> schtasks /query /tn GranolaSyncDaily
+<span class="pr">&gt;</span> schtasks /run   /tn GranolaSyncDaily
+<span class="pr">&gt;</span> powershell -ExecutionPolicy Bypass -File scripts\install_scheduled_task.ps1 <span class="fl">-Uninstall</span></pre>
+      </div>
+      <h3>macOS / Linux &mdash; cron</h3>
+      <p>Una entrada de cron que corre el sync diario a las 9:00:</p>
+      <div class="term">
+        <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">crontab</span><button class="copy" type="button">copiar</button></div>
+<pre>0 9 * * *  cd /ruta/a/Granolaupdater &amp;&amp; /usr/bin/python3 -m granola_sync <span class="fl">--mode</span>=daily <span class="fl">--config</span> config.yaml</pre>
+      </div>
+    </section>
+
+    <!-- EXPORTAR -->
+    <section id="exportar">
+      <p class="eyebrow">Paso 6</p>
+      <h2>Exportar a .txt (app con ventana)</h2>
+      <p>Para quien no usa la terminal. Es una aplicación con ventana que genera <strong>un archivo <code class="inl">.txt</code> por reunión</strong>, con resumen y transcripción, en la carpeta que elijas &mdash; sin Obsidian de por medio. Corre en Windows y macOS.</p>
+      <div class="term">
+        <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">terminal</span><button class="copy" type="button">copiar</button></div>
+<pre><span class="pr">$</span> granola-notes-gui</pre>
+      </div>
+      <ol class="steps">
+        <li>Elige la carpeta de salida.</li>
+        <li>Elige el rango: últimas 24 h, últimos 7 días, último mes o todo el historial.</li>
+        <li>Marca si quieres incluir la transcripción completa.</li>
+        <li>Presiona <strong>Exportar</strong> y al final abre la carpeta con un clic.</li>
+      </ol>
+      <p>Los archivos usan UTF-8 con BOM en Windows para que el Bloc de notas y Word muestren bien los acentos; en macOS abren directo con TextEdit.</p>
+    </section>
+
+    <!-- ENRICHMENT -->
+    <section id="enrichment">
+      <p class="eyebrow">Paso 7</p>
+      <h2>Enrichment: clasificar reuniones con IA</h2>
+      <p>El enrichment usa IA para leer cada nota y agregar metadata al frontmatter &mdash; <strong>proyectos</strong>, <strong>tags</strong> y <strong>tipo de reunión</strong> &mdash; para que después puedas filtrar y navegar tus reuniones por tema en Obsidian sin leerlas. Hay dos caminos:</p>
+
+      <h3>Opción A &mdash; Cowork <span class="tag">Recomendado</span></h3>
+      <p>En vez de que el script llame a la API paga, tu asistente de Cowork enriquece las notas directamente, aprovechando la suscripción que ya pagas. <strong>Sin costo por nota.</strong> Se hace con la skill <code class="inl">enrich-vault</code>: le pides &mdash; en lenguaje natural &mdash; que procese las notas del vault, y clasifica, agrega tags y, cuando aportan, secciones de <strong>Tareas</strong> y <strong>Seguimientos</strong>.</p>
+      <ul>
+        <li>On-demand: <em>&laquo;enriquece las reuniones de esta semana&raquo;</em>.</li>
+        <li>Automático: un agente programado que corre, por ejemplo, cada domingo sobre las notas nuevas.</li>
+      </ul>
+      <div class="call money">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M17 7.5c0-1.9-2.2-3.5-5-3.5s-5 1.3-5 3.2c0 4.6 10 2.3 10 6.8 0 2-2.2 3.5-5 3.5s-5-1.5-5-3.5"/></svg>
+        <div class="bd"><span class="lb">Costo</span><p>La <strong>API de Anthropic</strong> cobra por token: cada nota enriquecida por el script son centavos de dólar, que se suman si procesas cientos. La vía <strong>Cowork</strong> usa tu suscripción de tarifa plana &mdash; sin costo marginal por nota. Todo lo demás de la herramienta (sync, exportar, dry-run) es gratis: la API de Granola no cobra.</p></div>
+      </div>
+
+      <h3>Opción B &mdash; API integrada</h3>
+      <p>Si prefieres que el propio sync lo haga, actívalo en el config con tu API key. Corre una llamada de IA por cada nota nueva o actualizada.</p>
+      <div class="term">
+        <div class="term-bar"><span class="term-dot"></span><span class="term-dot"></span><span class="term-dot"></span><span class="term-title">config.yaml</span><button class="copy" type="button">copiar</button></div>
+<pre>enrichment:
+  enabled: true
+  api_key: <span class="cm">"sk-ant-tu-api-key"</span>
+  model: <span class="cm">"claude-opus-4-8"</span>   <span class="cm"># o "claude-haiku-4-5" (más barato)</span></pre>
+      </div>
+    </section>
+
+    <!-- REFERENCIA -->
+    <section id="referencia">
+      <p class="eyebrow">Referencia</p>
+      <h2>Referencia rápida</h2>
+
+      <h3>Campos del frontmatter de una nota</h3>
+      <p>Cada nota sincronizada lleva un bloque YAML al inicio. Estos son sus campos:</p>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Campo</th><th>Significado</th></tr></thead>
+          <tbody>
+            <tr><td><code>granola_id</code></td><td class="d">Identificador único de la reunión en Granola. Base de la detección de duplicados.</td></tr>
+            <tr><td><code>granola_updated</code></td><td class="d">Marca de la última edición en Granola. Permite detectar cambios y re-sincronizar.</td></tr>
+            <tr><td><code>date</code> · <code>time</code></td><td class="d">Fecha y hora de la reunión.</td></tr>
+            <tr><td><code>participants</code></td><td class="d">Correos de los asistentes (si están disponibles).</td></tr>
+            <tr><td><code>duration</code></td><td class="d">Duración en minutos, si el evento de calendario la tiene.</td></tr>
+            <tr><td><code>projects</code> · <code>tags</code> · <code>meeting_type</code></td><td class="d">Agregados por el enrichment (sección 7): proyectos, etiquetas y tipo.</td></tr>
+            <tr><td><code>enriched</code></td><td class="d">Marca que la nota ya pasó por enrichment vía Cowork.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Comandos de un vistazo</h3>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>Comando</th><th>Para qué</th></tr></thead>
+          <tbody>
+            <tr><td><code>granola-sync</code></td><td class="d">Sincronizar las últimas 24 h a Obsidian.</td></tr>
+            <tr><td><code>granola-sync --mode=historical --from=…</code></td><td class="d">Importar desde una fecha.</td></tr>
+            <tr><td><code>granola-sync --mode=dry-run</code></td><td class="d">Ver qué haría, sin escribir ni gastar.</td></tr>
+            <tr><td><code>granola-sync --mode=verify</code></td><td class="d">Revisar integridad de las notas.</td></tr>
+            <tr><td><code>granola-notes-gui</code></td><td class="d">Abrir la app con ventana para exportar a .txt.</td></tr>
+            <tr><td><code>pytest</code></td><td class="d">Correr la suite de tests (66 en la 1.0).</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Si algo falla</h3>
+      <ul>
+        <li><strong>&laquo;No pude conectarme a Granola&raquo;</strong> &mdash; abre la app de Granola e inicia sesión al menos una vez; la herramienta lee las credenciales de ahí.</li>
+        <li><strong>Error 401 repetido</strong> &mdash; el token caducó; vuelve a autenticarte en la app de Granola y reintenta.</li>
+        <li><strong>Se descartan notas al sincronizar</strong> &mdash; corre con <code class="inl">--verbose</code> y revisa el archivo de log; ahí se registra el detalle.</li>
+        <li><strong>Notas viejas sin tags</strong> &mdash; las creadas antes de la 1.0 no se auto-actualizan; enriquécelas con Cowork (sección 7).</li>
+      </ul>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <span class="eyebrow">granola-sync · v1.0.0</span>
+  <span>Sincroniza Granola → Obsidian · CLI + app de escritorio · Windows y macOS</span>
+</footer>
+
+<script>
+  // Copiar el contenido del bloque de terminal (sin el prompt).
+  document.querySelectorAll(".copy").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var pre = btn.closest(".term").querySelector("pre").cloneNode(true);
+      pre.querySelectorAll(".pr").forEach(function (p) { p.remove(); });
+      var text = pre.textContent.replace(/^\s+\n/gm, "").trimEnd();
+      navigator.clipboard.writeText(text).then(function () {
+        var old = btn.textContent;
+        btn.textContent = "copiado"; btn.classList.add("ok");
+        setTimeout(function () { btn.textContent = old; btn.classList.remove("ok"); }, 1400);
+      });
+    });
+  });
+
+  // Resaltar la sección activa en la tabla de contenidos.
+  var links = Array.prototype.slice.call(document.querySelectorAll("nav.toc a"));
+  var map = {};
+  links.forEach(function (a) { map[a.getAttribute("href").slice(1)] = a; });
+  var obs = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (e.isIntersecting) {
+        links.forEach(function (l) { l.classList.remove("active"); });
+        if (map[e.target.id]) map[e.target.id].classList.add("active");
+      }
+    });
+  }, { rootMargin: "-10% 0px -80% 0px", threshold: 0 });
+  document.querySelectorAll("main section[id]").forEach(function (s) { obs.observe(s); });
+</script>
+</body>
+</html>

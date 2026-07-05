@@ -2,6 +2,8 @@
 
 Sincroniza automáticamente tus notas de reuniones de [Granola](https://granola.ai) hacia tu vault de [Obsidian](https://obsidian.md).
 
+> 📖 **Tutorial completo** (novedades de la 1.0, instalación, modos, programación y enrichment): abre [`docs/tutorial.html`](docs/tutorial.html) en tu navegador.
+
 ## Requisitos
 
 - Python 3.11+
