@@ -1,10 +1,10 @@
 """Main sync orchestration engine.
 
 Supports four modes:
-- daily: Sync last 24h + verify last 2 weeks
+- daily: Sync documents from the last 24h
 - historical: Import all documents from a given date
 - verify: Check integrity of existing notes
-- dry-run: Show what would happen without writing
+- dry-run: Show what would happen without writing (no detail/enrichment calls)
 """
 
 from __future__ import annotations
@@ -143,47 +143,20 @@ class SyncEngine:
         self.stats.print_summary()
         return self.stats
 
+    @staticmethod
+    def _as_utc(dt: datetime) -> datetime:
+        """Normalize a datetime to UTC without overwriting an existing tzinfo."""
+        return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
     def _sync_daily(self) -> None:
-        """Sync last 24 hours + verify documents from last 2 weeks."""
+        """Sync documents created in the last 24 hours."""
         console.print("Fetching documents from Granola...")
         docs = self.api.get_documents()
-        now = datetime.now(timezone.utc)
-        cutoff_24h = now - timedelta(hours=24)
-
-        # Build index of existing notes
+        cutoff_24h = datetime.now(timezone.utc) - timedelta(hours=24)
         id_map = scan_vault_for_granola_ids(self.config.vault_path)
-        notes_dir = self.config.vault_path / "Reuniones"
-        existing_files = list(notes_dir.glob("*.md")) if notes_dir.exists() else []
-
         console.print(f"Found {len(docs)} documents, {len(id_map)} already synced\n")
 
-        for doc in docs:
-            if doc.deleted_at:
-                continue
-
-            # Check for existing by granola_id
-            if doc.id in id_map:
-                self.stats.skipped += 1
-                continue
-
-            # Check for existing by fuzzy title match
-            date_str = doc.meeting_date.strftime("%Y-%m-%d")
-            if fuzzy_match_title(
-                doc.title,
-                date_str,
-                existing_files,
-                self.config.sync.fuzzy_threshold,
-            ):
-                self.stats.skipped += 1
-                logger.info("Skipped (fuzzy match): %s", doc.title)
-                continue
-
-            # Only process documents from last 24h in daily mode
-            if doc.created_at.replace(tzinfo=timezone.utc) < cutoff_24h:
-                self.stats.skipped += 1
-                continue
-
-            self._process_document(doc)
+        self._process_new(docs, keep=lambda d: self._as_utc(d.created_at) >= cutoff_24h)
 
     def _sync_historical(self) -> None:
         """Import all documents from a given date."""
@@ -192,39 +165,57 @@ class SyncEngine:
             logger.error("Historical mode requires --from date")
             return
 
-        from_date = datetime.fromisoformat(from_date_str).replace(tzinfo=timezone.utc)
+        from_date = self._as_utc(datetime.fromisoformat(from_date_str))
         console.print(f"Importing documents from {from_date_str}...")
 
         docs = self.api.get_documents()
+        console.print(f"Found {len(docs)} documents total\n")
+
+        self._process_new(docs, keep=lambda d: self._as_utc(d.created_at) >= from_date)
+
+    def _process_new(self, docs, keep) -> None:
+        """Filter to genuinely-new docs, batch-hydrate them, and process each.
+
+        ``keep`` selects docs in the mode's date window. Documents already in the
+        vault (by granola_id or fuzzy title) are skipped. New docs are hydrated
+        with full content in as few batch requests as possible (skipped entirely
+        in dry-run).
+        """
         id_map = scan_vault_for_granola_ids(self.config.vault_path)
         notes_dir = self.config.vault_path / "Reuniones"
         existing_files = list(notes_dir.glob("*.md")) if notes_dir.exists() else []
 
-        console.print(f"Found {len(docs)} documents total\n")
-
+        to_process: list[GranolaDocument] = []
         for doc in docs:
             if doc.deleted_at:
                 continue
-
-            doc_created = doc.created_at
-            if doc_created.tzinfo is None:
-                doc_created = doc_created.replace(tzinfo=timezone.utc)
-
-            if doc_created < from_date:
+            if not keep(doc):
+                self.stats.skipped += 1
                 continue
-
             if doc.id in id_map:
                 self.stats.skipped += 1
                 continue
-
             date_str = doc.meeting_date.strftime("%Y-%m-%d")
             if fuzzy_match_title(
                 doc.title, date_str, existing_files, self.config.sync.fuzzy_threshold
             ):
                 self.stats.skipped += 1
+                logger.info("Skipped (fuzzy match): %s", doc.title)
                 continue
+            to_process.append(doc)
 
-            self._process_document(doc)
+        # Hydrate full content for all new docs at once. Dry-run stays free —
+        # no detail fetch, no transcript, no enrichment (see _process_document).
+        full_map: dict[str, GranolaDocument] = {}
+        if to_process and not self.config.dry_run:
+            try:
+                full = self.api.get_documents_batch([d.id for d in to_process])
+                full_map = {d.id: d for d in full}
+            except Exception as e:
+                logger.warning("Batch hydrate failed, using list data: %s", e)
+
+        for doc in to_process:
+            self._process_document(full_map.get(doc.id, doc))
 
     def _verify(self) -> None:
         """Verify integrity of existing synced notes."""
@@ -246,26 +237,20 @@ class SyncEngine:
         console.print(f"Verified {self.stats.verified} notes, {self.stats.errors} issues found")
 
     def _process_document(self, doc: GranolaDocument) -> None:
-        """Convert and write a single document to the vault."""
+        """Convert and write a single document to the vault.
+
+        In dry-run we only report what would be created — no transcript fetch
+        and no Claude enrichment (both cost API calls / money).
+        """
         try:
-            # 0. Re-fetch full document details (list endpoint may lack panel content)
-            try:
-                full_docs = self.api.get_documents_batch([doc.id])
-                if full_docs:
-                    doc = full_docs[0]
-                    logger.debug(
-                        "Fetched full doc '%s': notes=%s, summary=%s, overview=%s, "
-                        "notes_markdown=%s, panels=%d, last_viewed_panel=%s",
-                        doc.title,
-                        bool(doc.notes),
-                        bool(doc.summary),
-                        bool(doc.overview),
-                        bool(doc.notes_markdown),
-                        len(doc.panels),
-                        bool(doc.last_viewed_panel and doc.last_viewed_panel.content),
-                    )
-            except Exception as e:
-                logger.warning("Failed to fetch full details for '%s': %s", doc.title, e)
+            date_str = doc.meeting_date.strftime("%Y-%m-%d")
+
+            # Dry-run: report the would-be file without any paid/detail work.
+            if self.config.dry_run:
+                filename = generate_filename(doc.title, date_str)
+                self.stats.new += 1
+                console.print(f"  [green]+[/green] {filename} [dim](dry-run)[/dim]")
+                return
 
             # 1. Extract content — priority: last_viewed_panel (AI summary) > notes > panels > overview
             md_content = ""
@@ -308,8 +293,6 @@ class SyncEngine:
             if not md_content.strip() and doc.summary:
                 md_content = doc.summary
 
-            date_str = doc.meeting_date.strftime("%Y-%m-%d")
-
             # 2. Fetch transcript (if enabled)
             utterances = None
             if self.config.sync.include_transcripts:
@@ -333,8 +316,7 @@ class SyncEngine:
             notes_dir.mkdir(exist_ok=True)
 
             filename = generate_filename(doc.title, date_str)
-            if not self.config.dry_run:
-                write_note_atomic(notes_dir, filename, note_content)
+            write_note_atomic(notes_dir, filename, note_content)
 
             self.stats.new += 1
             console.print(f"  [green]+[/green] {filename}")
