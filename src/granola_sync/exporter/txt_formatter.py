@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import re
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from ..api.models import GranolaDocument, TranscriptUtterance
@@ -33,7 +33,7 @@ _SPANISH_MONTHS = [
 def _format_date_es(dt: datetime) -> str:
     """Format a datetime as '8 de mayo de 2026, 14:30' (local timezone)."""
     if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
+        dt = dt.replace(tzinfo=UTC)
     local = dt.astimezone()
     month = _SPANISH_MONTHS[local.month]
     return f"{local.day} de {month} de {local.year}, {local.hour:02d}:{local.minute:02d}"
@@ -107,12 +107,12 @@ def _format_transcript(utterances: list[TranscriptUtterance]) -> str:
     sorted_uts = sorted(utterances, key=lambda u: u.start_timestamp)
     base = sorted_uts[0].start_timestamp
     if base.tzinfo is None:
-        base = base.replace(tzinfo=timezone.utc)
+        base = base.replace(tzinfo=UTC)
 
     for u in sorted_uts:
         ts = u.start_timestamp
         if ts.tzinfo is None:
-            ts = ts.replace(tzinfo=timezone.utc)
+            ts = ts.replace(tzinfo=UTC)
         elapsed = int((ts - base).total_seconds())
         h, rem = divmod(max(elapsed, 0), 3600)
         m, s = divmod(rem, 60)

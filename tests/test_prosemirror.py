@@ -2,7 +2,6 @@
 
 from granola_sync.converters.prosemirror import ProseMirrorToMarkdown
 
-
 converter = ProseMirrorToMarkdown()
 
 

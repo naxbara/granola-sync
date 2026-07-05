@@ -23,9 +23,9 @@ from tkinter import filedialog, ttk
 
 from .. import __version__
 from ..auth.credentials import load_credentials
+from ..exporter.runner import ExportProgress, ExportResult, export_documents
 from ..logging_config import setup_logging
 from ..utils import default_credentials_path
-from ..exporter.runner import ExportProgress, ExportResult, export_documents
 
 logger = logging.getLogger(__name__)
 

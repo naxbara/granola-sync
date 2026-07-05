@@ -100,8 +100,8 @@ def main() -> None:
         sys.exit(1)
 
     # Initialize components
-    from .auth.token_manager import TokenManager
     from .api.client import GranolaAPIClient
+    from .auth.token_manager import TokenManager
     from .enrichment.claude_enricher import ClaudeEnricher
     from .sync.engine import SyncEngine
 

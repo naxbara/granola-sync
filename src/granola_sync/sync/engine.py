@@ -10,7 +10,7 @@ Supports four modes:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
 from rich.console import Console
@@ -99,13 +99,13 @@ class SyncEngine:
     @staticmethod
     def _as_utc(dt: datetime) -> datetime:
         """Normalize a datetime to UTC without overwriting an existing tzinfo."""
-        return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+        return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
     def _sync_daily(self) -> None:
         """Sync documents created in the last 24 hours."""
         console.print("Fetching documents from Granola...")
         docs = self.api.get_documents()
-        cutoff_24h = datetime.now(timezone.utc) - timedelta(hours=24)
+        cutoff_24h = datetime.now(UTC) - timedelta(hours=24)
         id_map = scan_vault_for_granola_ids(self.config.vault_path)
         console.print(f"Found {len(docs)} documents, {len(id_map)} already synced\n")
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import timezone
+from datetime import UTC
 from typing import TYPE_CHECKING
 
 import yaml
@@ -43,7 +43,7 @@ def render_meeting_note(
     # detect content changes and regenerate the note.
     updated = doc.updated_at
     if updated.tzinfo is None:
-        updated = updated.replace(tzinfo=timezone.utc)
+        updated = updated.replace(tzinfo=UTC)
 
     # Build frontmatter — omit empty optional fields to keep YAML clean.
     frontmatter: dict = {

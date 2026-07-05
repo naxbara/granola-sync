@@ -1,6 +1,6 @@
 """Tests for Obsidian template rendering."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from granola_sync.api.models import GranolaDocument, TranscriptUtterance
 from granola_sync.converters.template import render_meeting_note
@@ -24,16 +24,16 @@ def _make_utterances() -> list[TranscriptUtterance]:
         TranscriptUtterance(
             id="u1",
             document_id="test-doc-001",
-            start_timestamp=datetime(2026, 2, 6, 14, 30, 0, tzinfo=timezone.utc),
-            end_timestamp=datetime(2026, 2, 6, 14, 30, 10, tzinfo=timezone.utc),
+            start_timestamp=datetime(2026, 2, 6, 14, 30, 0, tzinfo=UTC),
+            end_timestamp=datetime(2026, 2, 6, 14, 30, 10, tzinfo=UTC),
             text="Hello everyone",
             source="system",
         ),
         TranscriptUtterance(
             id="u2",
             document_id="test-doc-001",
-            start_timestamp=datetime(2026, 2, 6, 14, 30, 15, tzinfo=timezone.utc),
-            end_timestamp=datetime(2026, 2, 6, 14, 30, 25, tzinfo=timezone.utc),
+            start_timestamp=datetime(2026, 2, 6, 14, 30, 15, tzinfo=UTC),
+            end_timestamp=datetime(2026, 2, 6, 14, 30, 25, tzinfo=UTC),
             text="Hi, thanks for joining",
             source="microphone",
         ),

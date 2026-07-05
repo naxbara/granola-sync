@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from granola_sync.api.models import GranolaDocument, TranscriptUtterance
 from granola_sync.exporter.txt_formatter import (
@@ -15,8 +15,8 @@ def _doc(**overrides) -> GranolaDocument:
     defaults = dict(
         id="doc-1",
         title="Reunión de prueba",
-        created_at=datetime(2026, 5, 8, 14, 30, tzinfo=timezone.utc),
-        updated_at=datetime(2026, 5, 8, 15, 30, tzinfo=timezone.utc),
+        created_at=datetime(2026, 5, 8, 14, 30, tzinfo=UTC),
+        updated_at=datetime(2026, 5, 8, 15, 30, tzinfo=UTC),
         google_calendar_event={
             "start": {"dateTime": "2026-05-08T14:30:00Z"},
             "end": {"dateTime": "2026-05-08T15:15:00Z"},
@@ -87,7 +87,7 @@ def test_format_document_includes_metadata_and_summary():
 
 
 def test_format_document_with_transcript():
-    base_ts = datetime(2026, 5, 8, 14, 30, 0, tzinfo=timezone.utc)
+    base_ts = datetime(2026, 5, 8, 14, 30, 0, tzinfo=UTC)
     utterances = [
         TranscriptUtterance(
             id="u1",

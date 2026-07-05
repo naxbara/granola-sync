@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 import yaml
@@ -61,7 +61,7 @@ def read_granola_updated(file_path: Path) -> datetime | None:
         dt = datetime.fromisoformat(str(raw))
     except (ValueError, TypeError):
         return None
-    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=UTC)
 
 
 def scan_vault_for_granola_ids(vault_path: Path) -> dict[str, Path]:

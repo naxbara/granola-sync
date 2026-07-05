@@ -5,8 +5,6 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from ..utils import generate_filename
-
 logger = logging.getLogger(__name__)
 
 

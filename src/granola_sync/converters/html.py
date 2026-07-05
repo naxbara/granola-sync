@@ -22,7 +22,7 @@ def html_to_markdown(content: str) -> str:
     for level in range(1, 7):
         text = re.sub(
             rf"<h{level}[^>]*>(.*?)</h{level}>",
-            lambda m: f"\n{'#' * level} {m.group(1)}\n",
+            lambda m, level=level: f"\n{'#' * level} {m.group(1)}\n",
             text,
             flags=re.DOTALL | re.IGNORECASE,
         )

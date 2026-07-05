@@ -7,10 +7,10 @@ ExportProgress events so callers (CLI/Tk) can show a progress bar.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Callable
 
 from ..api.client import GranolaAPIClient
 from ..api.models import GranolaDocument
@@ -50,14 +50,14 @@ def _filter_by_range(
 ) -> list[GranolaDocument]:
     if days_back is None:
         return [d for d in docs if not d.deleted_at]
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days_back)
+    cutoff = datetime.now(UTC) - timedelta(days=days_back)
     out: list[GranolaDocument] = []
     for d in docs:
         if d.deleted_at:
             continue
         created = d.meeting_date
         if created.tzinfo is None:
-            created = created.replace(tzinfo=timezone.utc)
+            created = created.replace(tzinfo=UTC)
         if created >= cutoff:
             out.append(d)
     return out
