@@ -23,7 +23,7 @@ sync:
 enrichment:
   enabled: true
   api_key: "sk-ant-..."     # Your Anthropic API key
-  model: "claude-sonnet-4-20250514"
+  model: "claude-opus-4-8"  # alto volumen / menor costo: "claude-haiku-4-5"
 
 # Logging
 logging:
