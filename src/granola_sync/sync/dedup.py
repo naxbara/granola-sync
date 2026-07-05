@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 import yaml
@@ -17,8 +18,8 @@ from thefuzz import fuzz
 logger = logging.getLogger(__name__)
 
 
-def extract_granola_id(file_path: Path) -> str | None:
-    """Extract granola_id from YAML frontmatter of a .md file."""
+def _parse_frontmatter(file_path: Path) -> dict | None:
+    """Parse the leading YAML frontmatter block of a .md file into a dict."""
     try:
         content = file_path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
@@ -33,12 +34,34 @@ def extract_granola_id(file_path: Path) -> str | None:
 
     try:
         data = yaml.safe_load(content[3:end])
-        if isinstance(data, dict):
-            return data.get("granola_id")
+        return data if isinstance(data, dict) else None
     except yaml.YAMLError:
-        pass
+        return None
 
-    return None
+
+def extract_granola_id(file_path: Path) -> str | None:
+    """Extract granola_id from YAML frontmatter of a .md file."""
+    fm = _parse_frontmatter(file_path)
+    return fm.get("granola_id") if fm else None
+
+
+def read_granola_updated(file_path: Path) -> datetime | None:
+    """Return the granola_updated timestamp (UTC-aware) from frontmatter.
+
+    Returns None when the field is absent or unparseable — callers treat that
+    as "cannot tell if changed", i.e. do not regenerate the note.
+    """
+    fm = _parse_frontmatter(file_path)
+    if not fm:
+        return None
+    raw = fm.get("granola_updated")
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(raw))
+    except (ValueError, TypeError):
+        return None
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
 
 
 def scan_vault_for_granola_ids(vault_path: Path) -> dict[str, Path]:

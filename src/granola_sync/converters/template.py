@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
-import yaml
+from datetime import timezone
 from typing import TYPE_CHECKING
+
+import yaml
 
 if TYPE_CHECKING:
     from ..api.models import GranolaDocument, TranscriptUtterance
@@ -37,6 +39,12 @@ def render_meeting_note(
     tags = enrichment.get("tags", []) if enrichment else []
     meeting_type = enrichment.get("meeting_type", "") if enrichment else ""
 
+    # granola_updated tracks the source doc's updated_at so future syncs can
+    # detect content changes and regenerate the note.
+    updated = doc.updated_at
+    if updated.tzinfo is None:
+        updated = updated.replace(tzinfo=timezone.utc)
+
     # Build frontmatter
     frontmatter: dict = {
         "type": "meeting",
@@ -44,6 +52,7 @@ def render_meeting_note(
         "time": time_str,
         "source": "granola",
         "granola_id": doc.id,
+        "granola_updated": updated.isoformat(),
         "duration": f"{duration}min" if duration else "",
         "participants": participants,
         "projects": projects,

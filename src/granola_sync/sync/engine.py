@@ -20,10 +20,12 @@ from ..api.models import GranolaDocument
 from ..converters.prosemirror import ProseMirrorToMarkdown
 from ..converters.template import render_meeting_note
 from ..utils import generate_filename
-from .dedup import fuzzy_match_title, scan_vault_for_granola_ids
+from .dedup import fuzzy_match_title, read_granola_updated, scan_vault_for_granola_ids
 from .vault import write_note_atomic
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from ..api.client import GranolaAPIClient
     from ..config import AppConfig
     from ..enrichment.claude_enricher import ClaudeEnricher
@@ -37,6 +39,7 @@ class SyncStats:
 
     def __init__(self) -> None:
         self.new = 0
+        self.updated = 0
         self.skipped = 0
         self.errors = 0
         self.verified = 0
@@ -46,6 +49,7 @@ class SyncStats:
         table.add_column("Metric", style="bold")
         table.add_column("Count", justify="right")
         table.add_row("New notes", str(self.new), style="green")
+        table.add_row("Updated notes", str(self.updated), style="green")
         table.add_row("Skipped (duplicates)", str(self.skipped), style="yellow")
         table.add_row("Verified", str(self.verified), style="blue")
         table.add_row("Errors", str(self.errors), style="red" if self.errors else "dim")
@@ -174,27 +178,38 @@ class SyncEngine:
         self._process_new(docs, keep=lambda d: self._as_utc(d.created_at) >= from_date)
 
     def _process_new(self, docs, keep) -> None:
-        """Filter to genuinely-new docs, batch-hydrate them, and process each.
+        """Filter docs in the date window, batch-hydrate, and create/update notes.
 
-        ``keep`` selects docs in the mode's date window. Documents already in the
-        vault (by granola_id or fuzzy title) are skipped. New docs are hydrated
-        with full content in as few batch requests as possible (skipped entirely
-        in dry-run).
+        ``keep`` selects docs in the mode's date window. A doc already in the
+        vault is regenerated only when its source ``updated_at`` is newer than
+        the note's stored ``granola_updated``; otherwise it is skipped. Fresh
+        docs are created. Full content is hydrated in as few batch requests as
+        possible (skipped entirely in dry-run).
         """
         id_map = scan_vault_for_granola_ids(self.config.vault_path)
-        notes_dir = self.config.vault_path / "Reuniones"
+        notes_dir = self.config.vault_path / self.config.sync.notes_folder
         existing_files = list(notes_dir.glob("*.md")) if notes_dir.exists() else []
 
-        to_process: list[GranolaDocument] = []
+        to_create: list[GranolaDocument] = []
+        to_update: list[tuple[GranolaDocument, Path]] = []
         for doc in docs:
             if doc.deleted_at:
                 continue
             if not keep(doc):
                 self.stats.skipped += 1
                 continue
+
+            # Already synced: regenerate only if the source changed since.
             if doc.id in id_map:
-                self.stats.skipped += 1
+                existing = id_map[doc.id]
+                stored = read_granola_updated(existing)
+                if stored is not None and self._as_utc(doc.updated_at) > stored:
+                    to_update.append((doc, existing))
+                    logger.info("Update queued (changed since sync): %s", doc.title)
+                else:
+                    self.stats.skipped += 1
                 continue
+
             date_str = doc.meeting_date.strftime("%Y-%m-%d")
             if fuzzy_match_title(
                 doc.title, date_str, existing_files, self.config.sync.fuzzy_threshold
@@ -202,20 +217,23 @@ class SyncEngine:
                 self.stats.skipped += 1
                 logger.info("Skipped (fuzzy match): %s", doc.title)
                 continue
-            to_process.append(doc)
+            to_create.append(doc)
 
-        # Hydrate full content for all new docs at once. Dry-run stays free —
-        # no detail fetch, no transcript, no enrichment (see _process_document).
+        # Hydrate full content for all new/changed docs at once. Dry-run stays
+        # free — no detail fetch, no transcript, no enrichment (see below).
         full_map: dict[str, GranolaDocument] = {}
-        if to_process and not self.config.dry_run:
+        if (to_create or to_update) and not self.config.dry_run:
+            ids = [d.id for d in to_create] + [d.id for d, _ in to_update]
             try:
-                full = self.api.get_documents_batch([d.id for d in to_process])
+                full = self.api.get_documents_batch(ids)
                 full_map = {d.id: d for d in full}
             except Exception as e:
                 logger.warning("Batch hydrate failed, using list data: %s", e)
 
-        for doc in to_process:
+        for doc in to_create:
             self._process_document(full_map.get(doc.id, doc))
+        for doc, path in to_update:
+            self._process_document(full_map.get(doc.id, doc), target_path=path)
 
     def _verify(self) -> None:
         """Verify integrity of existing synced notes."""
@@ -226,30 +244,61 @@ class SyncEngine:
             if not file_path.exists():
                 logger.warning("Missing file for granola_id %s: %s", granola_id, file_path)
                 self.stats.errors += 1
+                continue
+
+            content = file_path.read_text(encoding="utf-8")
+            issue = self._note_integrity_issue(content)
+            if issue:
+                logger.warning("Integrity issue in %s: %s", file_path.name, issue)
+                self.stats.errors += 1
             else:
-                content = file_path.read_text(encoding="utf-8")
-                if len(content) < 50:
-                    logger.warning("Suspiciously short note: %s (%d chars)", file_path.name, len(content))
-                    self.stats.errors += 1
-                else:
-                    self.stats.verified += 1
+                self.stats.verified += 1
 
         console.print(f"Verified {self.stats.verified} notes, {self.stats.errors} issues found")
 
-    def _process_document(self, doc: GranolaDocument) -> None:
+    @staticmethod
+    def _note_integrity_issue(content: str) -> str | None:
+        """Return a short description of the note's integrity problem, or None.
+
+        A note is healthy when it has a frontmatter block containing granola_id
+        and a non-empty body after the frontmatter (frontmatter alone easily
+        exceeds a naive length threshold, so we check the body explicitly).
+        """
+        if not content.startswith("---"):
+            return "missing frontmatter"
+        end = content.find("---", 3)
+        if end == -1:
+            return "unterminated frontmatter"
+        if "granola_id" not in content[3:end]:
+            return "frontmatter missing granola_id"
+        body = content[end + 3:].strip()
+        if not body:
+            return "empty body"
+        return None
+
+    def _process_document(
+        self, doc: GranolaDocument, target_path: Path | None = None
+    ) -> None:
         """Convert and write a single document to the vault.
 
-        In dry-run we only report what would be created — no transcript fetch
-        and no Claude enrichment (both cost API calls / money).
+        When ``target_path`` is given the note is regenerated in place (an
+        update); otherwise a new file is created. In dry-run we only report
+        what would happen — no transcript fetch and no Claude enrichment
+        (both cost API calls / money).
         """
+        is_update = target_path is not None
         try:
             date_str = doc.meeting_date.strftime("%Y-%m-%d")
 
-            # Dry-run: report the would-be file without any paid/detail work.
+            # Dry-run: report the would-be action without any paid/detail work.
             if self.config.dry_run:
-                filename = generate_filename(doc.title, date_str)
-                self.stats.new += 1
-                console.print(f"  [green]+[/green] {filename} [dim](dry-run)[/dim]")
+                label = target_path.name if is_update else generate_filename(doc.title, date_str)
+                if is_update:
+                    self.stats.updated += 1
+                    console.print(f"  [green]~[/green] {label} [dim](dry-run update)[/dim]")
+                else:
+                    self.stats.new += 1
+                    console.print(f"  [green]+[/green] {label} [dim](dry-run)[/dim]")
                 return
 
             # 1. Extract content — priority: last_viewed_panel (AI summary) > notes > panels > overview
@@ -311,15 +360,18 @@ class SyncEngine:
                 doc, md_content, enrichment, utterances
             )
 
-            # 5. Write to vault subfolder
-            notes_dir = self.config.vault_path / "Reuniones"
-            notes_dir.mkdir(exist_ok=True)
-
-            filename = generate_filename(doc.title, date_str)
-            write_note_atomic(notes_dir, filename, note_content)
-
-            self.stats.new += 1
-            console.print(f"  [green]+[/green] {filename}")
+            # 5. Write to the existing note (update) or a new file (create).
+            if is_update:
+                write_note_atomic(target_path.parent, target_path.name, note_content)
+                self.stats.updated += 1
+                console.print(f"  [green]~[/green] {target_path.name}")
+            else:
+                notes_dir = self.config.vault_path / self.config.sync.notes_folder
+                notes_dir.mkdir(exist_ok=True)
+                filename = generate_filename(doc.title, date_str)
+                write_note_atomic(notes_dir, filename, note_content)
+                self.stats.new += 1
+                console.print(f"  [green]+[/green] {filename}")
 
         except Exception as e:
             self.stats.errors += 1
