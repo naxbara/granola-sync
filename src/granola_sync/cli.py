@@ -6,6 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
+import httpx
 from rich.console import Console
 
 console = Console()
@@ -121,6 +122,16 @@ def main() -> None:
     except FileNotFoundError as e:
         console.print(f"\n[red]Error:[/red] {e}")
         console.print("Make sure the Granola app is installed and you've logged in at least once.")
+        sys.exit(1)
+    except httpx.HTTPStatusError as e:
+        console.print(
+            f"\n[red]Error:[/red] Granola API returned {e.response.status_code} for "
+            f"{e.request.url}. If this is 401, re-authenticate in the Granola app."
+        )
+        sys.exit(1)
+    except httpx.RequestError as e:
+        console.print(f"\n[red]Error:[/red] Could not reach the Granola API: {e}")
+        console.print("Check your internet connection and try again.")
         sys.exit(1)
     except RuntimeError as e:
         console.print(f"\n[red]Error:[/red] {e}")

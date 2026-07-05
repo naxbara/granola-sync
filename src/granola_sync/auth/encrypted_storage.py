@@ -51,6 +51,7 @@ def _get_master_key_macos(_granola_dir: Path) -> bytes:
         capture_output=True,
         text=True,
         check=True,
+        timeout=10,  # a Keychain access prompt must not hang a scheduled run
     )
     key_str = result.stdout.strip()
     # Keychain returns the key as a string; try base64-decode to 32 raw bytes first.

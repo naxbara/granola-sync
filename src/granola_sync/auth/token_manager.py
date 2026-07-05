@@ -34,11 +34,54 @@ class TokenManager:
         self._tokens = load_credentials(credentials_path)
         self._lock = threading.Lock()
 
+        if self._tokens.obtained_at == 0:
+            # No timestamp (e.g. Cognito fallback tokens) — we can't predict
+            # expiry, so we optimistically use the token and rely on a 401 from
+            # the API to trigger force_refresh() rather than refreshing blindly.
+            logger.warning(
+                "Loaded tokens without an obtained_at timestamp; expiry cannot be "
+                "predicted. Will refresh on a 401 from the API."
+            )
+
     @property
     def access_token(self) -> str:
         """Get a valid access token, refreshing if expired."""
         if self._is_expired():
             self._ensure_valid_token()
+        return self._tokens.access_token
+
+    def force_refresh(self) -> str:
+        """Force a token refresh regardless of the local clock.
+
+        Called when the API returns 401 despite our expiry estimate saying the
+        token is still valid (e.g. the token was revoked server-side, or the
+        Granola app rotated it out from under us).
+        """
+        with self._lock:
+            prev_obtained = self._tokens.obtained_at
+
+            # The Granola desktop app may have already rotated the token —
+            # prefer the file if it holds newer tokens than ours.
+            fresh = load_credentials(self._creds_path)
+            if fresh.obtained_at > prev_obtained:
+                self._tokens = fresh
+                logger.debug("force_refresh: using tokens rotated by Granola app")
+                return self._tokens.access_token
+
+            try:
+                self._refresh()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code in (400, 401):
+                    self._tokens = load_credentials(self._creds_path)
+                    if self._tokens.obtained_at > prev_obtained:
+                        return self._tokens.access_token
+                    raise RuntimeError(
+                        "WorkOS rejected the refresh token (likely expired or already "
+                        "rotated). Open the Granola desktop app to re-authenticate, then "
+                        f"retry. WorkOS response: {e.response.text}"
+                    ) from e
+                raise
+
         return self._tokens.access_token
 
     def _is_expired(self) -> bool:

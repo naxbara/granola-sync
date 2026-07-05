@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING
+import random
+import time
+from typing import TYPE_CHECKING, Any
 
 import httpx
 
@@ -20,6 +22,13 @@ DEFAULT_HEADERS = {
     "User-Agent": "Granola/5.354.0",
     "X-Client-Version": "5.354.0",
 }
+
+# Transient HTTP statuses worth retrying with backoff.
+_RETRY_STATUSES = frozenset({429, 500, 502, 503, 504})
+_MAX_ATTEMPTS = 3
+_MAX_BACKOFF = 10.0
+# get-documents-batch accepts many ids; chunk to keep requests reasonable.
+_BATCH_CHUNK = 50
 
 
 def _extract_doc_list(data: object) -> list[dict]:
@@ -47,6 +56,8 @@ class GranolaAPIClient:
             base_url=BASE_URL,
             headers=DEFAULT_HEADERS,
             timeout=30.0,
+            # Retry connection-level failures (DNS, connect, read resets).
+            transport=httpx.HTTPTransport(retries=2),
         )
 
     def close(self) -> None:
@@ -55,6 +66,50 @@ class GranolaAPIClient:
     def _auth_headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self._tm.access_token}"}
 
+    def _post(self, path: str, payload: dict) -> Any:
+        """POST with auth, retrying 429/5xx (backoff) and refreshing on 401.
+
+        Raises httpx.HTTPStatusError / httpx.RequestError on final failure.
+        """
+        refreshed = False
+        for attempt in range(_MAX_ATTEMPTS):
+            try:
+                resp = self._client.post(path, json=payload, headers=self._auth_headers())
+            except httpx.RequestError as e:
+                if attempt < _MAX_ATTEMPTS - 1:
+                    delay = self._backoff(attempt)
+                    logger.warning("Network error on %s (%s), retrying in %.1fs", path, e, delay)
+                    time.sleep(delay)
+                    continue
+                raise
+
+            # A 401 despite our expiry estimate: force one refresh, then retry.
+            if resp.status_code == 401 and not refreshed:
+                refreshed = True
+                logger.warning("401 from %s — forcing token refresh and retrying", path)
+                self._tm.force_refresh()
+                continue
+
+            if resp.status_code in _RETRY_STATUSES and attempt < _MAX_ATTEMPTS - 1:
+                delay = self._backoff(attempt)
+                logger.warning(
+                    "%s returned %d, retrying in %.1fs (attempt %d/%d)",
+                    path, resp.status_code, delay, attempt + 1, _MAX_ATTEMPTS,
+                )
+                time.sleep(delay)
+                continue
+
+            resp.raise_for_status()
+            return resp.json()
+
+        # Attempts exhausted (e.g. repeated 401 or 5xx): surface the last response.
+        resp.raise_for_status()
+        return resp.json()
+
+    @staticmethod
+    def _backoff(attempt: int) -> float:
+        return min(2 ** attempt + random.uniform(0, 0.5), _MAX_BACKOFF)
+
     def get_documents(self, limit: int = 100) -> list[GranolaDocument]:
         """Fetch all documents with auto-pagination."""
         all_docs: list[GranolaDocument] = []
@@ -62,17 +117,14 @@ class GranolaAPIClient:
 
         while True:
             logger.debug("Fetching documents (offset=%d, limit=%d)", offset, limit)
-            resp = self._client.post(
+            data = self._post(
                 "/v2/get-documents",
-                json={
+                {
                     "limit": limit,
                     "offset": offset,
                     "include_last_viewed_panel": True,
                 },
-                headers=self._auth_headers(),
             )
-            resp.raise_for_status()
-            data = resp.json()
 
             doc_list = _extract_doc_list(data)
             if not doc_list:
@@ -95,13 +147,7 @@ class GranolaAPIClient:
     def get_transcript(self, document_id: str) -> list[TranscriptUtterance]:
         """Fetch transcript utterances for a document."""
         logger.debug("Fetching transcript for document %s", document_id)
-        resp = self._client.post(
-            "/v1/get-document-transcript",
-            json={"document_id": document_id},
-            headers=self._auth_headers(),
-        )
-        resp.raise_for_status()
-        data = resp.json()
+        data = self._post("/v1/get-document-transcript", {"document_id": document_id})
 
         utterances_raw = data if isinstance(data, list) else data.get("utterances", [])
         utterances = []
@@ -114,16 +160,21 @@ class GranolaAPIClient:
         return utterances
 
     def get_documents_batch(self, doc_ids: list[str]) -> list[GranolaDocument]:
-        """Fetch multiple documents by ID (with full content including panels)."""
-        resp = self._client.post(
-            "/v1/get-documents-batch",
-            json={
-                "document_ids": doc_ids,
-                "include_last_viewed_panel": True,
-            },
-            headers=self._auth_headers(),
-        )
-        resp.raise_for_status()
-        data = resp.json()
-        doc_list = _extract_doc_list(data)
-        return [GranolaDocument(**d) for d in doc_list]
+        """Fetch multiple documents by ID (with full content including panels).
+
+        Batches ids into chunks so a single call can hydrate many documents in
+        one round-trip instead of one request per document.
+        """
+        docs: list[GranolaDocument] = []
+        for start in range(0, len(doc_ids), _BATCH_CHUNK):
+            chunk = doc_ids[start:start + _BATCH_CHUNK]
+            data = self._post(
+                "/v1/get-documents-batch",
+                {"document_ids": chunk, "include_last_viewed_panel": True},
+            )
+            for d in _extract_doc_list(data):
+                try:
+                    docs.append(GranolaDocument(**d))
+                except Exception as e:
+                    logger.warning("Failed to parse batched document: %s", e)
+        return docs
