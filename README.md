@@ -87,7 +87,8 @@ granola-sync --verbose
 
 ## Formato de salida
 
-Las notas se guardan en `{vault}/Notas Granola/` con el formato `YYYY-MM-DD-titulo-slugificado.md`.
+Las notas se guardan en `{vault}/Reuniones/` con el formato `YYYY-MM-DD-titulo-slugificado.md`
+(la subcarpeta es configurable con `sync.notes_folder`).
 
 Cada archivo contiene:
 
@@ -98,9 +99,9 @@ date: 2026-02-06
 time: 14:30
 source: granola
 granola_id: abc123
+granola_updated: 2026-02-06T15:20:00+00:00
 duration: 45min
 participants: [user@email.com]
-projects: []
 status: processed
 ---
 
@@ -143,7 +144,7 @@ Si activas el enrichment en `config.yaml`, Claude analiza cada nota y agrega al 
 enrichment:
   enabled: true
   api_key: "sk-ant-tu-api-key"
-  model: "claude-sonnet-4-20250514"
+  model: "claude-opus-4-8"   # para alto volumen y menor costo: "claude-haiku-4-5"
 ```
 
 ## Tests
@@ -158,20 +159,28 @@ pytest
 src/granola_sync/
 ├── cli.py                  # CLI con argparse
 ├── config.py               # Configuración YAML
+├── logging_config.py       # Setup de logging (Rich + archivo)
+├── utils.py                # Slugify, rutas por plataforma
 ├── auth/
-│   ├── credentials.py      # Lee supabase.json
-│   └── token_manager.py    # Refresh de tokens WorkOS
+│   ├── credentials.py      # Lee supabase.json (+ .enc de Granola 2.x)
+│   ├── token_manager.py    # Refresh de tokens WorkOS
+│   └── encrypted_storage.py# Descifra storage de Granola 2.x (DPAPI/Keychain)
 ├── api/
 │   ├── client.py           # Cliente API de Granola
 │   └── models.py           # Modelos Pydantic
 ├── converters/
-│   ├── prosemirror.py      # ProseMirror JSON → Markdown
-│   ├── transcript.py       # Formato de transcripción
+│   ├── prosemirror.py      # ProseMirror JSON → Markdown / texto plano
+│   ├── html.py             # HTML de paneles legacy → Markdown / texto
 │   └── template.py         # Template de nota Obsidian
 ├── enrichment/
 │   └── claude_enricher.py  # Enrichment con Claude API
-└── sync/
-    ├── engine.py            # Orquestación principal
-    ├── dedup.py             # Detección de duplicados
-    └── vault.py             # Escritura atómica al vault
+├── sync/                   # Pipeline CLI → Obsidian (.md con frontmatter)
+│   ├── engine.py            # Orquestación principal
+│   ├── dedup.py             # Detección de duplicados
+│   └── vault.py             # Escritura atómica al vault
+├── exporter/               # Pipeline GUI → .txt (sin dedup ni Obsidian)
+│   ├── runner.py            # Orquestación del export
+│   └── txt_formatter.py     # Render a texto plano
+└── gui/
+    └── app.py               # GUI Tkinter para usuarios no técnicos
 ```

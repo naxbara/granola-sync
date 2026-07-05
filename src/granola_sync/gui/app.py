@@ -20,6 +20,7 @@ import tkinter as tk
 from pathlib import Path
 from tkinter import filedialog, ttk
 
+from .. import __version__
 from ..auth.credentials import load_credentials
 from ..utils import default_credentials_path
 from ..exporter.runner import ExportProgress, ExportResult, export_documents
@@ -27,7 +28,7 @@ from ..exporter.runner import ExportProgress, ExportResult, export_documents
 logger = logging.getLogger(__name__)
 
 APP_TITLE = "Granola → Carpeta de Notas"
-APP_VERSION = "1.0"
+APP_VERSION = __version__
 DEFAULT_OUTPUT_NAME = "Granola Notes"
 
 _FONT_UI = "SF Pro Display" if sys.platform == "darwin" else "Segoe UI"
