@@ -8,7 +8,7 @@ from pathlib import Path
 import yaml
 
 from .constants import DEFAULT_NOTES_FOLDER, WORKOS_CLIENT_ID
-from .utils import default_credentials_path
+from .utils import credentials_exist, default_credentials_path
 
 
 @dataclass
@@ -93,8 +93,11 @@ class AppConfig:
         errors = []
         if not self.vault_path.exists():
             errors.append(f"Vault path does not exist: {self.vault_path}")
-        if not self.credentials_path.exists():
-            errors.append(f"Credentials file not found: {self.credentials_path}")
+        if not credentials_exist(self.credentials_path):
+            errors.append(
+                f"Credentials file not found: {self.credentials_path} "
+                "(nor its .enc twin) — open Granola and sign in at least once"
+            )
         if self.enrichment.enabled and not self.enrichment.api_key:
             errors.append("Enrichment enabled but no api_key provided")
         if self.mode == "historical" and not self.from_date:

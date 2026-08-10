@@ -25,6 +25,20 @@ def generate_filename(title: str, date_str: str, suffix: str = "") -> str:
     return f"{date_str}-{slug}{suffix}.md"
 
 
+def encrypted_credentials_path(path: Path) -> Path:
+    """Return the encrypted twin (supabase.json.enc) of a credentials path."""
+    return path.with_name(path.name + ".enc")
+
+
+def credentials_exist(path: Path) -> bool:
+    """True when the plaintext credentials file or its encrypted twin exists.
+
+    Recent Granola builds ship only the encrypted file, so the plaintext one
+    may legitimately be missing.
+    """
+    return path.exists() or encrypted_credentials_path(path).exists()
+
+
 def default_credentials_path() -> Path:
     """Return the default supabase.json path for the current platform."""
     system = platform.system()

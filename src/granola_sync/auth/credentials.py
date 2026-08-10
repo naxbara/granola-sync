@@ -17,6 +17,7 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
+from ..utils import encrypted_credentials_path
 from . import encrypted_storage
 
 logger = logging.getLogger(__name__)
@@ -47,7 +48,7 @@ class CognitoTokens(BaseModel):
 
 
 def _enc_path(path: Path) -> Path:
-    return path.with_name(path.name + ".enc")
+    return encrypted_credentials_path(path)
 
 
 def _mtime(path: Path) -> float:
@@ -70,6 +71,10 @@ def _read_raw(path: Path) -> dict:
             plaintext = encrypted_storage.decrypt_file(enc_path, dek)
             return json.loads(plaintext)
         except Exception as e:
+            # Recent Granola builds ship no plaintext twin, so there is nothing
+            # to fall back to — surface the decryption failure instead.
+            if not path.exists():
+                raise RuntimeError(f"Failed to decrypt {enc_path}: {e}") from e
             logger.warning("Failed to decrypt %s, falling back to plaintext: %s", enc_path, e)
 
     return json.loads(path.read_text(encoding="utf-8"))
@@ -118,12 +123,18 @@ def save_workos_tokens(path: Path, tokens: WorkOSTokens) -> None:
     raw = _read_raw(path)
     raw["workos_tokens"] = json.dumps(tokens.model_dump(), separators=(",", ":"))
 
-    plaintext_bytes = json.dumps(raw, indent=2).encode("utf-8")
-    tmp_path = path.with_suffix(".tmp")
-    tmp_path.write_bytes(plaintext_bytes)
-    tmp_path.replace(path)
+    def write_plaintext() -> None:
+        tmp_path = path.with_suffix(".tmp")
+        tmp_path.write_bytes(json.dumps(raw, indent=2).encode("utf-8"))
+        tmp_path.replace(path)
+
+    # Only refresh the plaintext file when Granola still keeps one — creating it
+    # from scratch would leave the tokens on disk in the clear.
+    if path.exists():
+        write_plaintext()
 
     enc_path = _enc_path(path)
+    encrypted = False
     if encrypted_storage.is_supported() and enc_path.exists():
         try:
             dek = encrypted_storage.get_dek(path.parent)
@@ -132,5 +143,11 @@ def save_workos_tokens(path: Path, tokens: WorkOSTokens) -> None:
             enc_tmp = enc_path.with_suffix(enc_path.suffix + ".tmp")
             enc_tmp.write_bytes(ciphertext)
             enc_tmp.replace(enc_path)
+            encrypted = True
         except Exception as e:
             logger.warning("Failed to update encrypted %s: %s", enc_path, e)
+
+    if not encrypted and not path.exists():
+        # Nothing persisted the rotated refresh token; plaintext is the last resort.
+        logger.warning("Falling back to plaintext credentials at %s", path)
+        write_plaintext()

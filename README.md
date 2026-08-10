@@ -45,6 +45,11 @@ Las credenciales de Granola se detectan automáticamente desde `supabase.json`:
 - **Windows**: `%APPDATA%\Granola\supabase.json`
 - **macOS**: `~/Library/Application Support/Granola/supabase.json`
 
+Granola 2.x guarda las credenciales cifradas en `supabase.json.enc` y puede no
+dejar ningún `supabase.json` en texto plano. Basta con que exista cualquiera de
+los dos: el `.enc` se desencripta con la clave del sistema (DPAPI en Windows,
+Llavero en macOS).
+
 ## Uso
 
 ```bash
