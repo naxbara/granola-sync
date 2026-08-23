@@ -7,7 +7,7 @@ from pathlib import Path
 
 import yaml
 
-from .constants import DEFAULT_NOTES_FOLDER, WORKOS_CLIENT_ID
+from .constants import DEFAULT_NOTES_FOLDER, DEFAULT_TRANSCRIPTS_FOLDER, WORKOS_CLIENT_ID
 from .utils import credentials_exist, default_credentials_path
 
 
@@ -16,6 +16,10 @@ class SyncConfig:
     include_transcripts: bool = True
     fuzzy_threshold: int = 85
     notes_folder: str = DEFAULT_NOTES_FOLDER
+    transcripts_folder: str = DEFAULT_TRANSCRIPTS_FOLDER
+    # separate: transcript lives in its own note, linked from a callout.
+    # inline: legacy behaviour, transcript embedded in the meeting note.
+    transcript_mode: str = "separate"
 
 
 @dataclass
@@ -71,6 +75,10 @@ class AppConfig:
             include_transcripts=sync_data.get("include_transcripts", True),
             fuzzy_threshold=sync_data.get("fuzzy_threshold", 85),
             notes_folder=sync_data.get("notes_folder", DEFAULT_NOTES_FOLDER),
+            transcripts_folder=sync_data.get(
+                "transcripts_folder", DEFAULT_TRANSCRIPTS_FOLDER
+            ),
+            transcript_mode=sync_data.get("transcript_mode", "separate"),
         )
 
         enrich_data = data.get("enrichment", {})
@@ -97,6 +105,11 @@ class AppConfig:
             errors.append(
                 f"Credentials file not found: {self.credentials_path} "
                 "(nor its .enc twin) — open Granola and sign in at least once"
+            )
+        if self.sync.transcript_mode not in ("separate", "inline", "none"):
+            errors.append(
+                f"Unknown sync.transcript_mode: {self.sync.transcript_mode} "
+                "(expected separate, inline or none)"
             )
         if self.enrichment.enabled and not self.enrichment.api_key:
             errors.append("Enrichment enabled but no api_key provided")

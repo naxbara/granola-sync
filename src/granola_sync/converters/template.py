@@ -7,6 +7,8 @@ from typing import TYPE_CHECKING
 
 import yaml
 
+from .transcript import render_callout, render_meeting_header, render_utterances
+
 if TYPE_CHECKING:
     from ..api.models import GranolaDocument, TranscriptUtterance
 
@@ -16,6 +18,8 @@ def render_meeting_note(
     markdown_content: str,
     enrichment: dict | None = None,
     utterances: list[TranscriptUtterance] | None = None,
+    transcript_mode: str = "inline",
+    note_stem: str | None = None,
 ) -> str:
     """Render a complete Obsidian meeting note with frontmatter.
 
@@ -23,7 +27,13 @@ def render_meeting_note(
         doc: The Granola document.
         markdown_content: ProseMirror content already converted to Markdown.
         enrichment: Optional Claude AI enrichment data.
-        utterances: Optional transcript utterances to embed.
+        utterances: Optional transcript utterances.
+        transcript_mode: "inline" embeds the transcript in the note (legacy,
+            still used by the GUI exporter), "separate" replaces it with a
+            folded callout linking to the standalone transcript note, "none"
+            drops it entirely.
+        note_stem: Filename stem of this note, required by "separate" mode to
+            build the link to its transcript.
 
     Returns:
         Complete Markdown string ready to write to .md file.
@@ -76,33 +86,18 @@ def render_meeting_note(
         parts.append(markdown_content)
         parts.append("")
 
-    # Separator + meeting metadata + transcript
-    if utterances or participants:
+    # The transcript either stays here (inline) or moves to its own note and
+    # leaves a callout behind (separate). Without utterances there is no
+    # transcript note to link to, so the meeting metadata stays in the note.
+    separate = transcript_mode == "separate" and utterances and note_stem
+    if separate:
+        parts.append(render_callout(doc, participants, note_stem))
+    elif transcript_mode != "none" and (utterances or participants):
         parts.append("---")
         parts.append("")
-
-        parts.append(
-            f"Chat with meeting transcript: "
-            f"[https://notes.granola.ai/t/{doc.id}]"
-            f"(https://notes.granola.ai/t/{doc.id})"
-        )
-        parts.append("")
-
-        parts.append(f"Meeting Title: {doc.title}")
-        parts.append(f"Date: {date_str}")
-        if participants:
-            parts.append(f"Meeting participants: {', '.join(participants)}")
-        parts.append("")
-
-    # Transcript (embedded in same file), ordered chronologically.
-    if utterances:
-        parts.append("Transcript:")
-        parts.append("")
-        for u in sorted(utterances, key=lambda x: x.start_timestamp):
-            timestamp = u.start_timestamp.strftime("%H:%M:%S")
-            source_label = "You" if u.source == "microphone" else "Speaker"
-            parts.append(f"**[{timestamp}]** _{source_label}_: {u.text}")
-            parts.append("")
+        parts.extend(render_meeting_header(doc, date_str, participants))
+        if utterances:
+            parts.extend(render_utterances(utterances))
 
     body = "\n".join(parts)
     return f"---\n{fm_str}---\n\n{body}"

@@ -10,6 +10,7 @@ Supports four modes:
 from __future__ import annotations
 
 import logging
+import re
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -20,6 +21,7 @@ from ..api.models import GranolaDocument
 from ..converters.html import html_to_markdown
 from ..converters.prosemirror import ProseMirrorToMarkdown
 from ..converters.template import render_meeting_note
+from ..converters.transcript import render_transcript_note, transcript_filename
 from ..utils import generate_filename
 from .dedup import fuzzy_match_title, read_granola_updated, scan_vault_for_granola_ids
 from .vault import write_note_atomic
@@ -211,7 +213,7 @@ class SyncEngine:
                 continue
 
             content = file_path.read_text(encoding="utf-8")
-            issue = self._note_integrity_issue(content)
+            issue = self._note_integrity_issue(content) or self._missing_transcript(content)
             if issue:
                 logger.warning("Integrity issue in %s: %s", file_path.name, issue)
                 self.stats.errors += 1
@@ -219,6 +221,25 @@ class SyncEngine:
                 self.stats.verified += 1
 
         console.print(f"Verified {self.stats.verified} notes, {self.stats.errors} issues found")
+
+    def _missing_transcript(self, content: str) -> str | None:
+        """Return an issue when the callout links to a transcript that is gone.
+
+        Notes written in "separate" mode point at Transcripciones/; a broken
+        link there means the transcript was lost, which the body check above
+        cannot see.
+        """
+        match = re.search(r"^> Ver: \[\[([^\]]+)\]\]", content, re.M)
+        if not match:
+            return None
+        target = (
+            self.config.vault_path
+            / self.config.sync.transcripts_folder
+            / f"{match.group(1)}.md"
+        )
+        if not target.exists():
+            return f"linked transcript not found: {target.name}"
+        return None
 
     @staticmethod
     def _note_integrity_issue(content: str) -> str | None:
@@ -257,12 +278,22 @@ class SyncEngine:
             # Dry-run: report the would-be action without any paid/detail work.
             if self.config.dry_run:
                 label = target_path.name if is_update else generate_filename(doc.title, date_str)
+                # Dry-run never fetches the transcript, so we can only report
+                # what the configuration would produce, not whether one exists.
+                pair = (
+                    ", note + transcript"
+                    if self.config.sync.transcript_mode == "separate"
+                    and self.config.sync.include_transcripts
+                    else ""
+                )
                 if is_update:
                     self.stats.updated += 1
-                    console.print(f"  [green]~[/green] {label} [dim](dry-run update)[/dim]")
+                    console.print(
+                        f"  [green]~[/green] {label} [dim](dry-run update{pair})[/dim]"
+                    )
                 else:
                     self.stats.new += 1
-                    console.print(f"  [green]+[/green] {label} [dim](dry-run)[/dim]")
+                    console.print(f"  [green]+[/green] {label} [dim](dry-run{pair})[/dim]")
                 return
 
             # 1. Extract content — priority: last_viewed_panel (AI summary) > notes > panels > overview
@@ -319,23 +350,55 @@ class SyncEngine:
             if self.enricher and not self.config.no_enrich:
                 enrichment = self.enricher.enrich(doc.title, md_content)
 
-            # 4. Render complete Obsidian note (transcript embedded)
-            note_content = render_meeting_note(
-                doc, md_content, enrichment, utterances
-            )
-
-            # 5. Write to the existing note (update) or a new file (create).
+            # 4. Resolve where the note goes. The transcript is paired with it
+            #    by filename stem, so an update keeps both files together even
+            #    if the meeting title changed upstream.
             if is_update:
-                write_note_atomic(target_path.parent, target_path.name, note_content)
-                self.stats.updated += 1
-                console.print(f"  [green]~[/green] {target_path.name}")
+                notes_dir = target_path.parent
+                filename = target_path.name
             else:
                 notes_dir = self.config.vault_path / self.config.sync.notes_folder
-                notes_dir.mkdir(exist_ok=True)
                 filename = generate_filename(doc.title, date_str)
-                write_note_atomic(notes_dir, filename, note_content)
+            note_stem = filename[:-3] if filename.endswith(".md") else filename
+
+            mode = self.config.sync.transcript_mode
+            separate = mode == "separate" and bool(utterances)
+
+            # 5. Render the note (and its standalone transcript, if separate).
+            note_content = render_meeting_note(
+                doc,
+                md_content,
+                enrichment,
+                utterances,
+                transcript_mode=mode,
+                note_stem=note_stem,
+            )
+
+            # 6. Write the transcript first: the note links to it, so it should
+            #    never point at a file that does not exist yet.
+            if separate:
+                transcripts_dir = (
+                    self.config.vault_path / self.config.sync.transcripts_folder
+                )
+                transcripts_dir.mkdir(parents=True, exist_ok=True)
+                write_note_atomic(
+                    transcripts_dir,
+                    transcript_filename(note_stem),
+                    render_transcript_note(
+                        doc, date_str, doc.participant_emails, utterances, note_stem
+                    ),
+                )
+
+            notes_dir.mkdir(parents=True, exist_ok=True)
+            write_note_atomic(notes_dir, filename, note_content)
+
+            suffix = " [dim](+ transcript)[/dim]" if separate else ""
+            if is_update:
+                self.stats.updated += 1
+                console.print(f"  [green]~[/green] {filename}{suffix}")
+            else:
                 self.stats.new += 1
-                console.print(f"  [green]+[/green] {filename}")
+                console.print(f"  [green]+[/green] {filename}{suffix}")
 
         except Exception as e:
             self.stats.errors += 1

@@ -27,11 +27,13 @@ cp config.example.yaml config.yaml
 ```
 
 ```yaml
-vault_path: "C:\\Users\\TuNombre\\iCloudDrive\\iCloud~md~obsidian\\TuVault"
+vault_path: "C:\\Users\\TuNombre\\Obsidian\\TuVault"
 
 sync:
   include_transcripts: true
   fuzzy_threshold: 85
+  transcripts_folder: "Transcripciones"
+  transcript_mode: separate   # separate | inline | none
 
 enrichment:
   enabled: false
@@ -122,7 +124,33 @@ status: processed
 ### Tema 2
 - Detalle relevante
 
+> [!quote]- Transcripcion completa
+> La transcripcion literal de esta reunion vive fuera del camino de lectura
+> por defecto para no pesar en las consultas al vault.
+> Ver: [[2026-02-06-reunion-con-cliente-transcript]]
+> Granola: https://notes.granola.ai/t/abc123
+> Meeting participants: user@email.com, otro@email.com
+```
+
+### La transcripción va aparte
+
+Con `transcript_mode: separate` (el default) la transcripción literal **no** se
+pega en la nota: va a `{vault}/Transcripciones/<nombre>-transcript.md` y la nota
+queda con el callout plegado de arriba. El motivo es de peso: la transcripción
+era el 80% del vault y arruinaba cualquier consulta con IA.
+
+El archivo de transcripción se ve así:
+
+```markdown
 ---
+type: transcripcion
+date: '2026-02-06'
+source: granola
+granola_id: abc123
+reunion: "[[2026-02-06-reunion-con-cliente]]"
+---
+
+> Transcripcion literal de [[2026-02-06-reunion-con-cliente]]. Fuera del camino de lectura por defecto.
 
 Chat with meeting transcript: [link](https://notes.granola.ai/t/abc123)
 
@@ -136,6 +164,14 @@ Transcript:
 
 **[14:30:15]** _You_: Tu respuesta...
 ```
+
+La etiqueta de hablante es binaria (`_You_` / `_Speaker_`) porque es todo lo que
+entrega Granola: sin plan pago no hay diarización, así que todos los
+interlocutores remotos comparten la etiqueta `_Speaker_`.
+
+Con `transcript_mode: inline` se conserva el comportamiento antiguo (todo en un
+archivo), que es el que usa el exportador de la GUI. Con `none` no se escribe
+transcripción.
 
 ## Detección de duplicados
 
