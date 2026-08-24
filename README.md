@@ -200,9 +200,54 @@ Transcript:
 **[14:30:15]** _You_: Tu respuesta...
 ```
 
-La etiqueta de hablante es binaria (`_You_` / `_Speaker_`) porque es todo lo que
-entrega Granola: sin plan pago no hay diarización, así que todos los
-interlocutores remotos comparten la etiqueta `_Speaker_`.
+### Quién habló
+
+Granola no entrega diarización: sin plan pago, todos los interlocutores remotos
+llegan con la misma etiqueta. `source: microphone` es el dueño del micrófono y
+siempre se escribe `_You_`; el resto colapsa en `_Speaker_`.
+
+Hay un solo caso que se puede resolver sin adivinar: **una reunión con un único
+otro asistente al que podemos nombrar**. Ahí `_Speaker_` pasa a ser su nombre y
+la transcripción lo declara en su frontmatter:
+
+```yaml
+speaker_attribution: 1a1     # 1a1 | granola  (ausente = etiqueta genérica)
+```
+
+Requiere `owner_emails` en la config para distinguir tus direcciones de las
+ajenas. Si algún día Granola empieza a mandar `detected_speaker_name`, esa
+etiqueta gana y el modo pasa a `granola` automáticamente.
+
+En un grupo de cinco los turnos son genuinamente indistinguibles, así que se
+mantiene `_Speaker_`.
+
+### Sugerencias que tú confirmas
+
+Cuando nadie figura en la invitación pero un nombre de `Personas/` aparece **a
+la vez en el título y en lo que se habla**, el sync lo anota como sugerencia —
+sin tocar la etiqueta del cuerpo:
+
+```yaml
+speaker_attribution: sugerido
+speaker_candidates: ["Juan Carlos Lanas", "Gustavo"]
+speaker_evidence: "'lanas' en el título y 18× en la transcripción"
+```
+
+Se resuelve de dos formas, indistintamente:
+
+```bash
+granola-sync --mode=speakers   # muestra evidencia y ejemplos, y aplica lo que elijas
+```
+
+o escribiendo `speaker_confirmed: Juan Carlos Lanas` a mano en Obsidian; el
+mismo comando lo aplica después. Al confirmar, las etiquetas genéricas del
+cuerpo pasan al nombre y el frontmatter queda en `confirmado` — que **sobrevive
+a los resyncs**: la pregunta se responde una sola vez.
+
+Exigir título **y** transcripción es lo que lo hace utilizable. Solo la
+transcripción trae a quien fue *mencionado*, no a quien habla: tu propio nombre
+aparece en todas. Se excluyen tus direcciones, las fichas de grupo, y si dos
+personas comparten el token la sugerencia lo declara en vez de elegir.
 
 Con `transcript_mode: inline` se conserva el comportamiento antiguo (todo en un
 archivo), que es el que usa el exportador de la GUI. Con `none` no se escribe

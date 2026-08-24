@@ -6,6 +6,11 @@
 # Windows example: "C:\\Users\\YourName\\Documents\\ObsidianVault"
 vault_path: "~/path/to/your/ObsidianVault"
 
+# Your own email addresses. Used to tell a one-to-one apart from a group call:
+# in a one-to-one the other speaker can be named without guessing, in a group
+# every remote voice collapses into a single "Speaker".
+owner_emails: []
+
 # Granola credentials (auto-detected if not specified)
 # Windows: %APPDATA%\Granola\supabase.json
 # macOS: ~/Library/Application Support/Granola/supabase.json

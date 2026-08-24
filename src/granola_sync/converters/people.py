@@ -162,18 +162,32 @@ class PersonasIndex:
     ``emails_alt``) so both agree on who is who.
     """
 
-    def __init__(self, entries: dict[str, Participant] | None = None) -> None:
+    def __init__(
+        self,
+        entries: dict[str, Participant] | None = None,
+        names: list[tuple[str, bool]] | None = None,
+    ) -> None:
         self._by_email = entries or {}
+        self._names = names or []
 
     def __len__(self) -> int:
         return len(self._by_email)
 
+    def names(self) -> list[tuple[str, bool]]:
+        """Every note's person name, paired with whether it is a group note.
+
+        Group notes ("Grupo MDS Casinos") stand for a roomful of trainees, not
+        someone who speaks, so callers filter them out.
+        """
+        return self._names
+
     @classmethod
     def from_vault(cls, vault_path: Path, folder: str = "Personas") -> PersonasIndex:
         entries: dict[str, Participant] = {}
+        names: list[tuple[str, bool]] = []
         base = vault_path / folder
         if not base.is_dir():
-            return cls(entries)
+            return cls(entries, names)
 
         for note in base.glob("*.md"):
             try:
@@ -199,18 +213,24 @@ class PersonasIndex:
                 addresses.extend(alt.split(","))
 
             # The filename is the person's name in this vault's convention.
+            display = _clean(data.get("name")) or note.stem
             person = Participant(
                 email="",
-                name=_clean(data.get("name")) or note.stem,
+                name=display,
                 company=_clean(data.get("company")),
                 title=_clean(data.get("role")),
             )
+            tags = data.get("tags")
+            is_group = data.get("type") == "group" or (
+                isinstance(tags, list) and "grupo" in tags
+            )
+            names.append((display, bool(is_group)))
             for raw in addresses:
                 email = _clean(raw)
                 if email:
                     entries.setdefault(email.lower(), person)
 
-        return cls(entries)
+        return cls(entries, names)
 
     def enrich(self, participants: list[Participant]) -> list[Participant]:
         """Fill missing names/companies from the vault, never overwriting."""

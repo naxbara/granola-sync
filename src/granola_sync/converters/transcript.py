@@ -12,10 +12,21 @@ indistinguishable from a migrated one, so the wording is copied verbatim
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from ..constants import TRANSCRIPT_SUFFIX
 from .people import Participant, emails, roster
+from .speakers import (
+    ATTRIBUTION_CONFIRMED,
+    ATTRIBUTION_NONE,
+    ATTRIBUTION_SUGGESTED,
+    GENERIC_LABEL,
+    Candidate,
+    resolve_speaker,
+)
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from ..api.models import GranolaDocument, TranscriptUtterance
@@ -24,6 +35,12 @@ if TYPE_CHECKING:
 def granola_url(doc_id: str) -> str:
     """Public Granola link for a document."""
     return f"https://notes.granola.ai/t/{doc_id}"
+
+
+def _yaml_quote(value: str) -> str:
+    """Double-quote a scalar so free text cannot break the frontmatter."""
+    escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 def _roster_line(participants: list[Participant]) -> str | None:
@@ -67,17 +84,23 @@ def render_meeting_header(
     return parts
 
 
-def render_utterances(utterances: list[TranscriptUtterance]) -> list[str]:
+
+def render_utterances(
+    utterances: list[TranscriptUtterance], speaker_label: str = GENERIC_LABEL
+) -> list[str]:
     """Transcript lines in chronological order, blank-separated.
 
-    The speaker label is binary because that is all Granola gives us:
-    ``source == "microphone"`` is the mic owner, everything else collapses
-    into a single "Speaker".
+    ``source == "microphone"`` is the mic owner and always renders as "You",
+    which is what the 482 migrated transcripts use. Everything else takes the
+    label resolved for this meeting, or its own name when Granola provides one.
     """
     lines: list[str] = ["Transcript:", ""]
     for u in sorted(utterances, key=lambda x: x.start_timestamp):
         timestamp = u.start_timestamp.strftime("%H:%M:%S")
-        source_label = "You" if u.source == "microphone" else "Speaker"
+        if u.source == "microphone":
+            source_label = "You"
+        else:
+            source_label = u.detected_speaker_name or speaker_label
         lines.append(f"**[{timestamp}]** _{source_label}_: {u.text}")
         lines.append("")
     return lines
@@ -89,6 +112,9 @@ def render_transcript_note(
     participants: list[Participant],
     utterances: list[TranscriptUtterance],
     note_stem: str,
+    owner_emails: set[str] | None = None,
+    candidates: list[Candidate] | None = None,
+    confirmed_speaker: str | None = None,
 ) -> str:
     """Render the standalone transcript note for ``Transcripciones/``.
 
@@ -99,7 +125,22 @@ def render_transcript_note(
         utterances: Transcript utterances to render.
         note_stem: Filename stem of the meeting note (no extension), used for
             the backlink so both files stay paired.
+        owner_emails: The vault owner's own addresses, so a one-to-one can be
+            told apart from a group call.
+        candidates: Names that might be the other speaker, recorded in the
+            frontmatter for the user to confirm. Never applied on their own.
+        confirmed_speaker: A name the user already confirmed. Survives a
+            resync — regenerating the note must not silently undo the answer.
     """
+    if confirmed_speaker:
+        speaker_label, attribution = confirmed_speaker, ATTRIBUTION_CONFIRMED
+    else:
+        speaker_label, attribution = resolve_speaker(participants, utterances, owner_emails)
+        if attribution == ATTRIBUTION_NONE and candidates:
+            # A suggestion changes the metadata, never the label: the body
+            # keeps saying "Speaker" until a human says otherwise.
+            attribution = ATTRIBUTION_SUGGESTED
+
     header = [
         "---",
         "type: transcripcion",
@@ -107,13 +148,30 @@ def render_transcript_note(
         "source: granola",
         f"granola_id: {doc.id}",
         f'reunion: "[[{note_stem}]]"',
+    ]
+    # Only recorded when it says something. Absent means the generic "Speaker",
+    # which is also what the migrated transcripts carry.
+    if attribution != ATTRIBUTION_NONE:
+        header.append(f"speaker_attribution: {attribution}")
+    if attribution == ATTRIBUTION_CONFIRMED:
+        header.append(f"speaker_confirmed: {speaker_label}")
+    elif attribution == ATTRIBUTION_SUGGESTED and candidates:
+        # Both values are quoted: the evidence string starts with a quoted
+        # token ("'marshall' en el título…") and would otherwise be read as a
+        # malformed YAML scalar, taking the whole frontmatter down with it.
+        names = ", ".join(_yaml_quote(c.name) for c in candidates)
+        header.append(f"speaker_candidates: [{names}]")
+        header.append(f"speaker_evidence: {_yaml_quote(candidates[0].evidence())}")
+    header += [
         "---",
         "",
         f"> Transcripcion literal de [[{note_stem}]]. "
         "Fuera del camino de lectura por defecto.",
         "",
     ]
-    body = render_meeting_header(doc, date_str, participants) + render_utterances(utterances)
+    body = render_meeting_header(doc, date_str, participants) + render_utterances(
+        utterances, speaker_label
+    )
     content = "\n".join(header + body)
     if not content.endswith("\n"):
         content += "\n"

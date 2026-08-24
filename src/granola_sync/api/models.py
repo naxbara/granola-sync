@@ -55,6 +55,7 @@ class DocumentPanel(BaseModel):
     created_at: str | None = None
     updated_at: str | None = None
     content_updated_at: str | None = None
+    has_speaker_attribution: bool = False
 
 
 class GranolaDocument(BaseModel):
@@ -145,3 +146,8 @@ class TranscriptUtterance(BaseModel):
     text: str
     source: str = "system"  # "system" | "microphone"
     is_final: bool = True
+    # Granola ships these fields but leaves them null: diarization is off and
+    # speaker labels are a paid feature. Declared anyway so that the day they
+    # start arriving we use them instead of guessing.
+    detected_speaker_name: str | None = None
+    transcriber_user_id: str | None = None

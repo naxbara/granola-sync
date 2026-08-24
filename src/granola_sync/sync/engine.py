@@ -22,11 +22,13 @@ from ..converters import people
 from ..converters.html import html_to_markdown
 from ..converters.people import PersonasIndex
 from ..converters.prosemirror import ProseMirrorToMarkdown
+from ..converters.speakers import suggest_speakers
 from ..converters.template import render_meeting_note
 from ..converters.transcript import render_transcript_note, transcript_filename
 from ..sources.calendar import CalendarLookup
 from ..utils import generate_filename
 from .dedup import fuzzy_match_title, read_granola_updated, scan_vault_for_granola_ids
+from .speaker_confirm import confirmed_speaker
 from .vault import write_note_atomic
 
 if TYPE_CHECKING:
@@ -99,6 +101,27 @@ class SyncEngine:
             calendar_emails = self._calendar.emails_for(doc.title, doc.meeting_date)
 
         return people.resolve(doc, calendar_emails, self._personas)
+
+    def _owner_names(self) -> set[str]:
+        """What the vault calls the owner, so suggestions skip their own name.
+
+        It shows up in every transcript — people say "Sebastián" constantly —
+        and would otherwise be the loudest candidate in the room.
+        """
+        names = set()
+        for email in self.config.owner_emails:
+            known = self._personas.enrich([people.Participant(email=email)])[0]
+            if known.name:
+                names.add(known.name)
+        return names
+
+    def _speaker_candidates(self, doc: GranolaDocument, utterances) -> list:
+        """Names from the vault that the title and the transcript both mention."""
+        if not utterances or self._personas is None:
+            return []
+        return suggest_speakers(
+            doc.title, utterances, self._personas, self._owner_names()
+        )
 
     def run(self) -> SyncStats:
         """Execute sync based on the configured mode."""
@@ -410,11 +433,22 @@ class SyncEngine:
                     self.config.vault_path / self.config.sync.transcripts_folder
                 )
                 transcripts_dir.mkdir(parents=True, exist_ok=True)
+                transcript_name = transcript_filename(note_stem)
+                # A name the user already settled outlives a regeneration:
+                # answering the question once has to be enough.
+                settled = confirmed_speaker(transcripts_dir / transcript_name)
                 write_note_atomic(
                     transcripts_dir,
-                    transcript_filename(note_stem),
+                    transcript_name,
                     render_transcript_note(
-                        doc, date_str, attendees, utterances, note_stem
+                        doc,
+                        date_str,
+                        attendees,
+                        utterances,
+                        note_stem,
+                        owner_emails=set(self.config.owner_emails),
+                        candidates=None if settled else self._speaker_candidates(doc, utterances),
+                        confirmed_speaker=settled,
                     ),
                 )
 

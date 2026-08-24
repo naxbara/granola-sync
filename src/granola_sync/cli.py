@@ -20,10 +20,12 @@ def main() -> None:
     )
     parser.add_argument(
         "--mode",
-        choices=["daily", "historical", "verify", "dry-run", "auth-calendar"],
+        choices=["daily", "historical", "verify", "dry-run", "auth-calendar", "speakers"],
         default="daily",
         help="Sync mode (default: daily). auth-calendar authorizes read-only "
-        "access to Google Calendar and exits — the only interactive mode.",
+        "access to Google Calendar and exits. speakers walks the transcripts "
+        "with a suggested speaker name and asks you to confirm. Both are "
+        "interactive and never run unattended.",
     )
     parser.add_argument(
         "--from",
@@ -118,6 +120,14 @@ def main() -> None:
             console.print(f"\n[red]Error:[/red] {e}")
             sys.exit(1)
         console.print("[green]Calendar authorized[/green] (read-only).")
+        return
+
+    # Confirming speakers only reads the vault: no Granola credentials needed.
+    if args.mode == "speakers":
+        from .sync.speaker_confirm import run as confirm_speakers
+
+        transcripts = config.vault_path / config.sync.transcripts_folder
+        confirm_speakers(transcripts)
         return
 
     # Validate config

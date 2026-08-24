@@ -70,6 +70,11 @@ class AppConfig:
     calendar: CalendarConfig = field(default_factory=CalendarConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
+    # The vault owner's own addresses. Used to tell a one-to-one apart from a
+    # group call, which is the only case where the other speaker can be named
+    # without guessing.
+    owner_emails: list[str] = field(default_factory=list)
+
     # Directory relative paths resolve against: the config file's own folder,
     # so a scheduled run behaves the same whatever the working directory is.
     base_dir: Path = field(default_factory=lambda: Path.cwd())
@@ -98,6 +103,12 @@ class AppConfig:
 
         if "workos_client_id" in data:
             config.workos_client_id = data["workos_client_id"]
+
+        config.owner_emails = [
+            str(email).strip().lower()
+            for email in (data.get("owner_emails") or [])
+            if str(email).strip()
+        ]
 
         sync_data = data.get("sync", {})
         config.sync = SyncConfig(
