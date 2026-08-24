@@ -97,6 +97,41 @@ granola-sync --no-enrich
 granola-sync --verbose
 ```
 
+## Asistentes: de dónde salen los nombres
+
+Granola solo mira los calendarios de la cuenta con la que se registró, y no
+acepta cuentas personales en el plan gratuito. El resultado es que casi ninguna
+reunión llega con asistentes. Por eso los participantes se arman en cascada,
+del dato más duro al más blando:
+
+1. `people.attendees` de Granola — trae correo y, cuando existe, **nombre,
+   empresa y cargo** (`details.person.employment`)
+2. `people.creator` — el organizador, presente en todos los documentos
+3. `google_calendar_event.attendees` de Granola
+4. **Google Calendar directo** (opcional, ver abajo)
+5. `Personas/` del vault — completa nombre, empresa y rol por correo, sin red
+
+`participants:` en el frontmatter sigue siendo una lista de correos: es la
+llave con que se cruzan las fichas de `Personas/`. Los nombres van al cuerpo,
+en la línea `Asistentes:` del callout, y solo aparecen los que sí se pudieron
+identificar.
+
+### Activar Google Calendar (opcional)
+
+```bash
+pip install -e ".[calendar]"
+granola-sync --mode=auth-calendar   # una sola vez, abre el navegador
+```
+
+Pide **solo** el permiso `calendar.readonly` y guarda su token en
+`secrets/google_token.json`. Configúralo con el bloque `calendar:` del
+`config.example.yaml`.
+
+El cruce entre la reunión de Granola y el evento del calendario se hace por
+hora de inicio (±30 min) y parecido del título. **Si el match no es claro no se
+escribe nada**: dos eventos parecidos a la misma hora, o un evento sin
+invitados, dejan la reunión sin asistentes antes que inventarlos.
+
 ## Formato de salida
 
 Las notas se guardan en `{vault}/Reuniones/` con el formato `YYYY-MM-DD-titulo-slugificado.md`

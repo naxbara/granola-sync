@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from granola_sync.api.models import GranolaDocument, TranscriptUtterance
+from granola_sync.converters.people import SOURCE_ATTENDEE, from_emails
 from granola_sync.converters.template import render_meeting_note
 from granola_sync.converters.transcript import (
     render_callout,
@@ -19,7 +20,9 @@ from granola_sync.converters.transcript import (
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
-PARTICIPANTS = ["ana@habitat.cl", "beto@lab-ai.org"]
+PARTICIPANT_EMAILS = ["ana@habitat.cl", "beto@lab-ai.org"]
+# Addresses with no names attached: renders exactly like the migrated notes.
+PARTICIPANTS = from_emails(PARTICIPANT_EMAILS, SOURCE_ATTENDEE)
 NOTE_STEM = "2026-08-21-reunion-de-prueba"
 
 
@@ -29,7 +32,7 @@ def _make_doc(**overrides) -> GranolaDocument:
         "title": "Reunión de prueba",
         "created_at": "2026-08-21T20:08:00Z",
         "updated_at": "2026-08-21T21:16:34Z",
-        "people": {"attendees": [{"email": e} for e in PARTICIPANTS]},
+        "people": {"attendees": [{"email": e} for e in PARTICIPANT_EMAILS]},
     }
     defaults.update(overrides)
     return GranolaDocument(**defaults)
@@ -70,6 +73,35 @@ def test_callout_matches_golden():
     result = render_callout(_make_doc(), PARTICIPANTS, NOTE_STEM)
     expected = (FIXTURES / "expected_callout.md").read_text(encoding="utf-8")
     assert result == expected
+
+
+def test_callout_names_the_people_it_can_name():
+    from granola_sync.converters.people import Participant
+
+    named = [
+        Participant(email="ana@habitat.cl", name="Ana Pérez", company="AFP Hábitat", title="Jefa"),
+        Participant(email="anon@x.cl"),
+    ]
+    result = render_callout(_make_doc(), named, NOTE_STEM)
+    assert "> Meeting participants: ana@habitat.cl, anon@x.cl" in result
+    # Only the person we can actually name; the rest are already listed above.
+    assert "> Asistentes: Ana Pérez <ana@habitat.cl> — AFP Hábitat, Jefa\n" in result
+    assert "anon@x.cl ·" not in result
+
+
+def test_one_person_with_two_addresses_is_named_once():
+    """Real case: Denise Marshall joined under both of her work addresses."""
+    from granola_sync.converters.people import Participant
+
+    twice = [
+        Participant(email="dmarshall@tsplegal.cl", name="Denise Marshall", company="TSP Legal"),
+        Participant(email="denise@dnxconsultora.cl", name="Denise Marshall", company="TSP Legal"),
+    ]
+    result = render_callout(_make_doc(), twice, NOTE_STEM)
+    # Both addresses stay on the identity line...
+    assert "dmarshall@tsplegal.cl, denise@dnxconsultora.cl" in result
+    # ...but she is a single human.
+    assert result.count("Denise Marshall") == 1
 
 
 def test_callout_field_order_is_fixed():

@@ -30,6 +30,29 @@ class EnrichmentConfig:
 
 
 @dataclass
+class CalendarConfig:
+    """Google Calendar as a participant source.
+
+    Granola only sees the calendars of the account it was signed up with, so
+    most meetings arrive with no attendees. Reading Calendar directly recovers
+    them. Off by default: it needs an OAuth client to exist first.
+    """
+
+    enabled: bool = False
+    calendar_id: str = "primary"
+    client_secrets_path: str = ""
+    token_path: str = "secrets/google_token.json"
+    # How far a calendar event's start may sit from the recording's start.
+    match_window_minutes: int = 30
+    # Minimum fuzzy score between the meeting title and the event summary.
+    # 55 comes from measurement, not taste: over a real week the correct but
+    # loosely-named match scored 59 ("Geovita presentación" vs "Geovitas y
+    # Sebastián Suárez") while the best *wrong* candidate scored 38, so this
+    # sits in the gap with room on both sides.
+    title_threshold: int = 55
+
+
+@dataclass
 class LoggingConfig:
     dir: str = "logs"
     verbose: bool = False
@@ -44,7 +67,12 @@ class AppConfig:
     workos_client_id: str = WORKOS_CLIENT_ID
     sync: SyncConfig = field(default_factory=SyncConfig)
     enrichment: EnrichmentConfig = field(default_factory=EnrichmentConfig)
+    calendar: CalendarConfig = field(default_factory=CalendarConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
+
+    # Directory relative paths resolve against: the config file's own folder,
+    # so a scheduled run behaves the same whatever the working directory is.
+    base_dir: Path = field(default_factory=lambda: Path.cwd())
 
     # CLI overrides (not in YAML)
     mode: str = "daily"
@@ -60,6 +88,7 @@ class AppConfig:
             data = yaml.safe_load(f) or {}
 
         config = cls()
+        config.base_dir = path.resolve().parent
 
         if "vault_path" in data:
             config.vault_path = Path(data["vault_path"]).expanduser()
@@ -88,6 +117,16 @@ class AppConfig:
             model=enrich_data.get("model", "claude-sonnet-4-20250514"),
         )
 
+        cal_data = data.get("calendar", {})
+        config.calendar = CalendarConfig(
+            enabled=cal_data.get("enabled", False),
+            calendar_id=cal_data.get("calendar_id", "primary"),
+            client_secrets_path=cal_data.get("client_secrets_path", ""),
+            token_path=cal_data.get("token_path", "secrets/google_token.json"),
+            match_window_minutes=cal_data.get("match_window_minutes", 30),
+            title_threshold=cal_data.get("title_threshold", 55),
+        )
+
         log_data = data.get("logging", {})
         config.logging = LoggingConfig(
             dir=log_data.get("dir", "logs"),
@@ -113,6 +152,11 @@ class AppConfig:
             )
         if self.enrichment.enabled and not self.enrichment.api_key:
             errors.append("Enrichment enabled but no api_key provided")
+        if self.calendar.enabled and not self.calendar.client_secrets_path:
+            errors.append(
+                "Calendar enabled but no calendar.client_secrets_path provided "
+                "(path to the Google OAuth client JSON)"
+            )
         if self.mode == "historical" and not self.from_date:
             errors.append("Historical mode requires --from date")
         return errors

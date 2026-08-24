@@ -15,6 +15,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from ..constants import TRANSCRIPT_SUFFIX
+from .people import Participant, emails, roster
 
 if TYPE_CHECKING:
     from ..api.models import GranolaDocument, TranscriptUtterance
@@ -25,10 +26,30 @@ def granola_url(doc_id: str) -> str:
     return f"https://notes.granola.ai/t/{doc_id}"
 
 
+def _roster_line(participants: list[Participant]) -> str | None:
+    """The named roster, or None when we only ever learned addresses.
+
+    Only people we can actually name go here — the bare addresses are already
+    on the ``Meeting participants`` line right above, and repeating them adds
+    noise without adding a fact. Keeping the line conditional also means a
+    meeting with no identified names renders exactly like the notes migrated
+    in August, so the vault stays uniform.
+    """
+    named = [person for person in participants if person.name]
+    if not named:
+        return None
+    # Someone who joined under two addresses is still one person here, even
+    # though both addresses stay on the participants list above: that list is
+    # the identity key the vault matches on, this line is for a human.
+    seen: set[str] = set()
+    once = [p for p in named if not (p.name in seen or seen.add(p.name))]
+    return f"Asistentes: {roster(once)}"
+
+
 def render_meeting_header(
-    doc: GranolaDocument, date_str: str, participants: list[str]
+    doc: GranolaDocument, date_str: str, participants: list[Participant]
 ) -> list[str]:
-    """The Granola preamble (link, title, date, participants) as lines."""
+    """The Granola preamble (link, title, date, attendees) as lines."""
     url = granola_url(doc.id)
     parts = [
         f"Chat with meeting transcript: [{url}]({url})",
@@ -37,7 +58,11 @@ def render_meeting_header(
         f"Date: {date_str}",
     ]
     if participants:
-        parts.append(f"Meeting participants: {', '.join(participants)}")
+        parts.append(f"Meeting participants: {', '.join(emails(participants))}")
+    named = _roster_line(participants)
+    if named:
+        # Whoever reads the transcript needs to know who the Speakers are.
+        parts.append(named)
     parts.append("")
     return parts
 
@@ -61,7 +86,7 @@ def render_utterances(utterances: list[TranscriptUtterance]) -> list[str]:
 def render_transcript_note(
     doc: GranolaDocument,
     date_str: str,
-    participants: list[str],
+    participants: list[Participant],
     utterances: list[TranscriptUtterance],
     note_stem: str,
 ) -> str:
@@ -70,7 +95,7 @@ def render_transcript_note(
     Args:
         doc: The Granola document.
         date_str: Meeting date as YYYY-MM-DD.
-        participants: Participant emails, already resolved.
+        participants: Attendees, already resolved.
         utterances: Transcript utterances to render.
         note_stem: Filename stem of the meeting note (no extension), used for
             the backlink so both files stay paired.
@@ -95,11 +120,13 @@ def render_transcript_note(
     return content
 
 
-def render_callout(doc: GranolaDocument, participants: list[str], note_stem: str) -> str:
+def render_callout(
+    doc: GranolaDocument, participants: list[Participant], note_stem: str
+) -> str:
     """Render the folded callout that replaces the transcript in the note.
 
-    Field order is fixed (Ver -> Granola -> Meeting participants) to match the
-    migrated notes.
+    Field order is fixed (Ver -> Granola -> Meeting participants -> Asistentes)
+    to match the migrated notes, which end at Meeting participants.
     """
     lines = [
         "> [!quote]- Transcripcion completa",
@@ -109,7 +136,10 @@ def render_callout(doc: GranolaDocument, participants: list[str], note_stem: str
         f"> Granola: {granola_url(doc.id)}",
     ]
     if participants:
-        lines.append(f"> Meeting participants: {', '.join(participants)}")
+        lines.append(f"> Meeting participants: {', '.join(emails(participants))}")
+    named = _roster_line(participants)
+    if named:
+        lines.append(f"> {named}")
     return "\n".join(lines) + "\n"
 
 

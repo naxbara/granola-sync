@@ -32,6 +32,20 @@ enrichment:
   api_key: "sk-ant-..."     # Your Anthropic API key
   model: "claude-opus-4-8"  # alto volumen / menor costo: "claude-haiku-4-5"
 
+# Google Calendar as a participant source (read-only).
+# Granola only sees the calendars of the account it was signed up with, so most
+# meetings arrive with no attendees. Reading Calendar directly recovers them.
+# Authorize once with: granola-sync --mode=auth-calendar
+calendar:
+  enabled: false
+  calendar_id: "primary"
+  # Google OAuth client JSON (Desktop app). Can be shared with another tool of
+  # yours: this only ever requests the calendar.readonly scope.
+  client_secrets_path: ""
+  token_path: "secrets/google_token.json"  # relative to this config file
+  match_window_minutes: 30   # how far the event's start may sit from the recording
+  title_threshold: 55        # minimum fuzzy score between title and event summary
+
 # Logging
 logging:
   dir: "logs"

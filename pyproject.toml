@@ -29,6 +29,10 @@ dev = [
 gui = [
     "pyinstaller>=6.0",
 ]
+calendar = [
+    "google-api-python-client>=2.100",
+    "google-auth-oauthlib>=1.2",
+]
 
 [project.scripts]
 granola-sync = "granola_sync.cli:main"

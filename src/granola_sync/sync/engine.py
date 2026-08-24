@@ -18,10 +18,13 @@ from rich.console import Console
 from rich.table import Table
 
 from ..api.models import GranolaDocument
+from ..converters import people
 from ..converters.html import html_to_markdown
+from ..converters.people import PersonasIndex
 from ..converters.prosemirror import ProseMirrorToMarkdown
 from ..converters.template import render_meeting_note
 from ..converters.transcript import render_transcript_note, transcript_filename
+from ..sources.calendar import CalendarLookup
 from ..utils import generate_filename
 from .dedup import fuzzy_match_title, read_granola_updated, scan_vault_for_granola_ids
 from .vault import write_note_atomic
@@ -73,6 +76,29 @@ class SyncEngine:
         self.enricher = enricher
         self.converter = ProseMirrorToMarkdown()
         self.stats = SyncStats()
+        # Participant sources are built on first use: dry-run must not
+        # authenticate against Calendar or walk the vault for nothing.
+        self._personas: PersonasIndex | None = None
+        self._calendar = None
+        self._calendar_ready = False
+
+    def _participants(self, doc: GranolaDocument) -> list[people.Participant]:
+        """Who attended, from Granola, then Calendar, then the vault."""
+        if self._personas is None:
+            self._personas = PersonasIndex.from_vault(self.config.vault_path)
+            logger.debug("Indexed %d addresses from Personas/", len(self._personas))
+
+        if not self._calendar_ready:
+            self._calendar = CalendarLookup.build(self.config)
+            self._calendar_ready = True
+            if self._calendar:
+                console.print("[dim]Google Calendar lookup enabled[/dim]")
+
+        calendar_emails = None
+        if self._calendar:
+            calendar_emails = self._calendar.emails_for(doc.title, doc.meeting_date)
+
+        return people.resolve(doc, calendar_emails, self._personas)
 
     def run(self) -> SyncStats:
         """Execute sync based on the configured mode."""
@@ -364,7 +390,9 @@ class SyncEngine:
             mode = self.config.sync.transcript_mode
             separate = mode == "separate" and bool(utterances)
 
-            # 5. Render the note (and its standalone transcript, if separate).
+            # 5. Resolve who attended, then render the note (and its
+            #    standalone transcript, if separate).
+            attendees = self._participants(doc)
             note_content = render_meeting_note(
                 doc,
                 md_content,
@@ -372,6 +400,7 @@ class SyncEngine:
                 utterances,
                 transcript_mode=mode,
                 note_stem=note_stem,
+                participants=attendees,
             )
 
             # 6. Write the transcript first: the note links to it, so it should
@@ -385,7 +414,7 @@ class SyncEngine:
                     transcripts_dir,
                     transcript_filename(note_stem),
                     render_transcript_note(
-                        doc, date_str, doc.participant_emails, utterances, note_stem
+                        doc, date_str, attendees, utterances, note_stem
                     ),
                 )
 

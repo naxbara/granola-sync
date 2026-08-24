@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import yaml
 
+from .people import SOURCE_ATTENDEE, Participant, emails, from_emails
 from .transcript import render_callout, render_meeting_header, render_utterances
 
 if TYPE_CHECKING:
@@ -20,6 +21,7 @@ def render_meeting_note(
     utterances: list[TranscriptUtterance] | None = None,
     transcript_mode: str = "inline",
     note_stem: str | None = None,
+    participants: list[Participant] | None = None,
 ) -> str:
     """Render a complete Obsidian meeting note with frontmatter.
 
@@ -34,6 +36,9 @@ def render_meeting_note(
             drops it entirely.
         note_stem: Filename stem of this note, required by "separate" mode to
             build the link to its transcript.
+        participants: Attendees already resolved by the caller (with names and
+            companies where known). Falls back to the document's own addresses,
+            which is what the GUI exporter has.
 
     Returns:
         Complete Markdown string ready to write to .md file.
@@ -42,7 +47,9 @@ def render_meeting_note(
     date_str = meeting_date.strftime("%Y-%m-%d")
     time_str = meeting_date.strftime("%H:%M")
     duration = doc.duration_minutes
-    participants = doc.participant_emails
+    if participants is None:
+        participants = from_emails(doc.participant_emails, SOURCE_ATTENDEE)
+    participant_emails = emails(participants)
 
     # Enrichment data
     projects = enrichment.get("projects", []) if enrichment else []
@@ -66,8 +73,10 @@ def render_meeting_note(
     }
     if duration:
         frontmatter["duration"] = f"{duration}min"
-    if participants:
-        frontmatter["participants"] = participants
+    # Stays a plain list of addresses: it is the identity key the vault's
+    # Personas notes are matched on. The names live in the body instead.
+    if participant_emails:
+        frontmatter["participants"] = participant_emails
     if projects:
         frontmatter["projects"] = projects
     frontmatter["status"] = "processed"

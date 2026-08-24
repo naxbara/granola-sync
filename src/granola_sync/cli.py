@@ -20,9 +20,10 @@ def main() -> None:
     )
     parser.add_argument(
         "--mode",
-        choices=["daily", "historical", "verify", "dry-run"],
+        choices=["daily", "historical", "verify", "dry-run", "auth-calendar"],
         default="daily",
-        help="Sync mode (default: daily)",
+        help="Sync mode (default: daily). auth-calendar authorizes read-only "
+        "access to Google Calendar and exits — the only interactive mode.",
     )
     parser.add_argument(
         "--from",
@@ -99,6 +100,25 @@ def main() -> None:
         log_dir=str(log_dir),
         verbose=config.logging.verbose,
     )
+
+    # Authorizing Calendar needs neither the vault nor Granola credentials, so
+    # it runs before validation and exits on its own.
+    if args.mode == "auth-calendar":
+        from .sources.calendar import CalendarAuthError, get_credentials
+
+        if not config.calendar.client_secrets_path:
+            console.print(
+                "[red]Config error:[/red] set calendar.client_secrets_path "
+                "to your Google OAuth client JSON first."
+            )
+            sys.exit(1)
+        try:
+            get_credentials(config, allow_interactive=True)
+        except CalendarAuthError as e:
+            console.print(f"\n[red]Error:[/red] {e}")
+            sys.exit(1)
+        console.print("[green]Calendar authorized[/green] (read-only).")
+        return
 
     # Validate config
     errors = config.validate()
