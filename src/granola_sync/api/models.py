@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ProseMirrorMark(BaseModel):
@@ -57,6 +57,15 @@ class DocumentPanel(BaseModel):
     content_updated_at: str | None = None
     has_speaker_attribution: bool = False
 
+    @model_validator(mode="before")
+    @classmethod
+    def _drop_nulls(cls, data: object) -> object:
+        # The API sends explicit nulls for fields it has no value for
+        # (e.g. has_speaker_attribution). Let the declared defaults win.
+        if isinstance(data, dict):
+            return {k: v for k, v in data.items() if v is not None}
+        return data
+
 
 class GranolaDocument(BaseModel):
     """A Granola meeting document."""
@@ -89,6 +98,12 @@ class GranolaDocument(BaseModel):
     def _title_not_none(cls, v: object) -> str:
         # The API sometimes returns an explicit null title; coerce to "".
         return v if isinstance(v, str) else ""
+
+    @field_validator("panels", mode="before")
+    @classmethod
+    def _panels_not_none(cls, v: object) -> object:
+        # An explicit null panel list must not blow up the whole document.
+        return [] if v is None else v
 
     @property
     def meeting_date(self) -> datetime:

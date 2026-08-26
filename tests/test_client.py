@@ -95,3 +95,40 @@ def test_raises_after_exhausting_retries():
     with pytest.raises(httpx.HTTPStatusError):
         api.get_documents()
     api.close()
+
+
+@respx.mock
+def test_null_panel_fields_do_not_drop_the_document():
+    """Granola sends explicit nulls (e.g. has_speaker_attribution) — parse anyway."""
+    respx.post("https://api.granola.ai/v2/get-documents").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "docs": [
+                    {
+                        "id": "008dd336-b568-4e5c-ab03-7c289130a07c",
+                        "title": None,
+                        "created_at": "2026-08-23T10:00:00Z",
+                        "updated_at": "2026-08-23T10:00:00Z",
+                        "panels": None,
+                        "last_viewed_panel": {
+                            "document_id": None,
+                            "id": None,
+                            "title": "Resumen",
+                            "content": "<p>hola</p>",
+                            "has_speaker_attribution": None,
+                        },
+                    }
+                ]
+            },
+        )
+    )
+
+    api = GranolaAPIClient(_FakeTokenManager())
+    docs = api.get_documents()
+    api.close()
+
+    assert len(docs) == 1
+    assert docs[0].panels == []
+    assert docs[0].last_viewed_panel.has_speaker_attribution is False
+    assert docs[0].last_viewed_panel.content == "<p>hola</p>"
