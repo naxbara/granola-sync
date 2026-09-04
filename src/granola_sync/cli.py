@@ -158,6 +158,21 @@ def main() -> None:
         engine = SyncEngine(config, api_client, enricher)
         stats = engine.run()
 
+        # The vault's Indices/ are built from the frontmatter this sync just
+        # wrote, so they go stale the moment a note lands. Best-effort: a
+        # failure here is reported but never fails the sync.
+        from .sync.indices import regenerate as regenerate_indices
+
+        idx = regenerate_indices(config, wrote_notes=bool(stats.new or stats.updated))
+        if idx.ok:
+            console.print("[dim]Vault indexes regenerated[/dim]")
+        elif idx.failed:
+            console.print(
+                f"[yellow]Warning:[/yellow] {idx.reason}\n"
+                "[dim]The sync itself is fine. Rebuild them with: "
+                "python Recursos/segundo-cerebro/generar-indices.py --vault . --apply[/dim]"
+            )
+
         console.print(f"\n[dim]Log file: {log_file}[/dim]")
 
         # Exit with error code if there were errors

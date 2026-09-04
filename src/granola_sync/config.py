@@ -53,6 +53,26 @@ class CalendarConfig:
 
 
 @dataclass
+class IndicesConfig:
+    """Regenerate the vault's derived indexes after a sync that wrote notes.
+
+    The indexes in the vault's `Indices/` folder (meetings by client, by
+    person, timeline, decisions) are built from the frontmatter this sync
+    writes, so they go stale the moment a new note lands. Running the
+    generator here keeps them fresh without a second scheduled task.
+
+    Deliberately best-effort: a failure here is reported but never fails the
+    sync. The notes are the product; the indexes are derived from them and can
+    always be rebuilt by hand.
+    """
+
+    enabled: bool = False
+    # Path to the generator, relative to the vault (or absolute).
+    script: str = "Recursos/segundo-cerebro/generar-indices.py"
+    timeout_seconds: int = 180
+
+
+@dataclass
 class LoggingConfig:
     dir: str = "logs"
     verbose: bool = False
@@ -68,6 +88,7 @@ class AppConfig:
     sync: SyncConfig = field(default_factory=SyncConfig)
     enrichment: EnrichmentConfig = field(default_factory=EnrichmentConfig)
     calendar: CalendarConfig = field(default_factory=CalendarConfig)
+    indices: IndicesConfig = field(default_factory=IndicesConfig)
     logging: LoggingConfig = field(default_factory=LoggingConfig)
 
     # The vault owner's own addresses. Used to tell a one-to-one apart from a
@@ -136,6 +157,15 @@ class AppConfig:
             token_path=cal_data.get("token_path", "secrets/google_token.json"),
             match_window_minutes=cal_data.get("match_window_minutes", 30),
             title_threshold=cal_data.get("title_threshold", 55),
+        )
+
+        idx_data = data.get("indices", {})
+        config.indices = IndicesConfig(
+            enabled=idx_data.get("enabled", False),
+            script=idx_data.get(
+                "script", "Recursos/segundo-cerebro/generar-indices.py"
+            ),
+            timeout_seconds=idx_data.get("timeout_seconds", 180),
         )
 
         log_data = data.get("logging", {})

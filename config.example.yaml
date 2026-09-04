@@ -40,6 +40,15 @@ enrichment:
   api_key: "sk-ant-..."     # Your Anthropic API key
   model: "claude-opus-4-8"  # alto volumen / menor costo: "claude-haiku-4-5"
 
+# Regenerate the vault's derived indexes (Indices/) after a sync that wrote
+# notes. They are built from the frontmatter this sync writes, so they go stale
+# as soon as a new note lands. Best-effort: a failure is reported but never
+# fails the sync, and it is skipped on dry-run or when nothing was written.
+indices:
+  enabled: false
+  script: "Recursos/segundo-cerebro/generar-indices.py"  # relative to the vault
+  timeout_seconds: 180
+
 # Google Calendar as a participant source (read-only).
 # Granola only sees the calendars of the account it was signed up with, so most
 # meetings arrive with no attendees. Reading Calendar directly recovers them.
