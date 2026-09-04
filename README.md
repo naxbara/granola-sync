@@ -256,8 +256,18 @@ transcripción.
 ## Detección de duplicados
 
 El sync detecta duplicados de dos formas:
-1. **Por `granola_id`** en el frontmatter YAML (match exacto)
-2. **Por título fuzzy** con la misma fecha (threshold configurable, default 85%)
+
+1. **Por `granola_id`** en el frontmatter YAML (match exacto). Es la vía
+   principal: cubre todo lo que escribió este sync, aunque hayas movido la nota
+   a otra carpeta del vault. Las notas de `Transcripciones/` quedan fuera del
+   mapa aunque repitan el `granola_id` de su reunión — la que interesa es la
+   nota de reunión, que es la que lleva `granola_updated` y la que se regenera.
+2. **Por título fuzzy** con la misma fecha (`fuzzy_threshold`, default 85), y
+   **solo contra notas sin `granola_id`**: las escritas a mano o anteriores al
+   id. Una nota que ya tiene el id de *otra* reunión no puede ser un duplicado,
+   así que no entra a la comparación — si no, dos reuniones del mismo día con
+   títulos parecidos ("… v2") se leen como una sola. Con `fuzzy_threshold: 0`
+   el fallback se apaga y solo queda el match por id.
 
 ## Enrichment con Claude AI (opcional)
 

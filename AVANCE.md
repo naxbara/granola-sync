@@ -1,6 +1,6 @@
 # Avance — Granolaupdater
 
-> Última actualización: 2026-08-23
+> Última actualización: 2026-09-04
 
 Sincroniza las notas de reunión de Granola al vault de Obsidian
 (`Reuniones/` + `Transcripciones/`). Repo: `github.com/naxbara/granola-sync`,
@@ -43,6 +43,66 @@ Sigue vigente; la Fase 6 de arriba se come solo una parte.
 ---
 
 ## Ejecutado
+
+### 2026-09-04
+
+**La segunda reunión del día dejó de leerse como duplicado.** "Revisión
+Política IA Volcom v2" nunca entró al vault: el fuzzy match la comparó con la
+nota de la reunión anterior del mismo día (score ≈95 contra el umbral 85) y la
+saltó, transcripción incluida. Al destaparlo apareció una causa mayor.
+
+- **`scan_vault_for_granola_ids` apuntaba a la transcripción, no a la
+  reunión.** Las notas de `Transcripciones/` repiten el `granola_id` de su
+  reunión y, como esa carpeta ordena después de `Reuniones/`, ganaban la
+  entrada del mapa: 507 de 524 ids apuntaban al archivo equivocado. Ahora se
+  excluyen por `type: transcripcion` (constante `TRANSCRIPT_NOTE_TYPE`).
+- **Efecto colateral que llevaba semanas silencioso:** las transcripciones no
+  llevan `granola_updated`, así que toda reunión editada en Granola después de
+  su sync se saltaba en vez de regenerarse. En todos los logs hay **un solo**
+  `Update queued`. Con el mapa arreglado, la comparación vuelve a hacerse
+  contra la nota correcta.
+- **El fuzzy solo mira notas sin `granola_id`.** Lo que escribió este sync se
+  desduplica por id; una nota con id de *otra* reunión no puede ser un
+  duplicado. El fallback queda para notas escritas a mano o previas al id.
+- **`fuzzy_threshold: 0` lo apaga** (antes 0 hacía matchear todo).
+- Reunión y transcripción (1356 líneas) ya en el vault. **157 tests en verde.**
+
+### 2026-08-31
+
+**El sync regenera los índices del vault.** La Fase 3 del
+[[Plan-Segundo-Cerebro-IA-Agosto-2026]] creó cuatro índices derivados en
+`Indices/` del vault (reuniones por cliente, por persona, línea de tiempo y
+decisiones) que se construyen **desde el frontmatter que escribe este sync**.
+Quedaban viejos apenas entraba una nota nueva, así que el disparador correcto
+es este, no un reloj aparte: se regeneran **cuando cambia la fuente**.
+
+- **Módulo nuevo `sync/indices.py`** con `regenerate(config, wrote_notes)`.
+  Corre el generador del vault con el mismo intérprete que el sync
+  (`sys.executable`, no el Python del PATH — un venv no debe salirse de su
+  propio entorno).
+- **Config nueva `indices:`** (`enabled`, `script`, `timeout_seconds`).
+  Apagada por defecto en `config.example.yaml`, encendida en el `config.yaml`
+  de Sebastián. El `script` se resuelve relativo al vault o absoluto.
+- **Enganchado en `cli.py`** justo después de `engine.run()`.
+
+**Las dos reglas que definen el módulo**, ambas cubiertas por tests:
+
+1. **Nunca hace fallar el sync.** Script ausente, exit code distinto de cero,
+   timeout o `OSError` vuelven como `IndicesResult.failed` y se reportan como
+   warning con el comando para rehacerlo a mano. Las notas son el producto;
+   los índices son derivados y se reconstruyen cuando sea.
+2. **Solo corre si algo cambió.** Sin notas nuevas ni actualizadas, o en
+   `--mode=dry-run`, no se ejecuta. Un dry-run promete no escribir nada, y eso
+   incluye los índices.
+
+**11 tests nuevos** (`tests/test_indices.py`) — los tres casos de "no debe
+correr", el camino feliz, los argumentos que se pasan (`--vault` y `--apply`:
+sin `--apply` el generador es dry-run y no escribiría nada), ruta absoluta, y
+los cuatro modos de falla. Suite completa: **154 en verde**.
+
+Verificado end-to-end contra el vault real: `--mode=dry-run` no toca los
+índices, y con `wrote_notes=True` los cuatro archivos de `Indices/` quedan
+regenerados con el timestamp de la corrida.
 
 ### 2026-08-23
 
@@ -115,12 +175,41 @@ tocó en ningún momento.
    reescribir el cuerpo — **hay reuniones que sí son de Kauel**.
 2. **Resolver las sugerencias pendientes** con `--mode=speakers` sobre las
    transcripciones nuevas que deje el sync nocturno.
-3. Fase 5 (skills) y Fase 6 (higiene del repo).
+3. **Confirmar el enganche de índices en una corrida nocturna real** con notas
+   nuevas — hasta ahora se verificó forzando `wrote_notes=True`, porque el día
+   que se implementó no llegaron notas nuevas.
+4. **Ver un `Update queued` real.** La vía de actualización estuvo muerta desde
+   agosto por el mapa de ids: hay que confirmar en una corrida nocturna que una
+   reunión editada en Granola se regenera de verdad. Ojo con el otro lado de lo
+   mismo: un `--mode=historical` sobre el histórico ahora **sí** puede
+   reescribir notas viejas editadas a mano. Antes de correrlo, dry-run.
+5. Fase 5 (skills) y Fase 6 (higiene del repo).
 
 ---
 
 ## Decisiones y bloqueos
 
+- **2026-09-04 — El fuzzy de títulos no se apagó, se acotó.** Subir el umbral
+  no arreglaba nada: un sufijo "v2" puntúa ≈95 y habría que exigir títulos
+  idénticos. Apagarlo del todo dejaba sin red las notas hechas a mano. Se optó
+  por sacar del universo de candidatos toda nota que ya tenga `granola_id`:
+  esa pertenece a otra reunión y por definición no es un duplicado.
+- **2026-09-04 — El `granola_id` de una transcripción no identifica la nota.**
+  Regla del vault, no solo de este proyecto: cualquier mapa `id → archivo`
+  tiene que excluir `type: transcripcion`. Registrada en el vault:
+  `Notas/Decisiones/2026-09-04-el-granola-id-de-una-transcripcion-no-identifica-la-nota.md`.
+- **2026-08-31 — Los índices del vault se regeneran acá, no en una tarea
+  aparte.** El disparador es el cambio de la fuente, no un reloj: los índices
+  salen del frontmatter que escribe este sync. Se descartó dejarlos al lint
+  semanal del vault (quedaban hasta 7 días viejos) y una tarea programada
+  propia (otra cosa que mantener, corriendo aunque no haya nada nuevo). El
+  chequeo del `lint-vault` se conserva igual, pero como **red de seguridad**:
+  detecta índices viejos si este enganche falló sin que nadie lo notara.
+  Registrada en el vault: `Notas/Decisiones/2026-08-31-los-indices-se-regeneran-al-final-del-sync.md`.
+- **2026-08-31 — El enganche es best-effort a propósito.** Si el generador
+  falla, el sync **igual termina bien**. Invertir esa relación —que un índice
+  derivado pueda tumbar la sincronización de las notas— sería subordinar el
+  producto a su subproducto.
 - **2026-08-23 — La transcripción va separada por defecto.** `transcript_mode`
   arranca en `separate` en el código, no solo en el `config.yaml` de
   Sebastián: es el comportamiento correcto ahora. `inline` queda para el
