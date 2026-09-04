@@ -204,6 +204,13 @@ class SyncEngine:
         id_map = scan_vault_for_granola_ids(self.config.vault_path)
         notes_dir = self.config.vault_path / self.config.sync.notes_folder
         existing_files = list(notes_dir.glob("*.md")) if notes_dir.exists() else []
+        # A note that already carries a granola_id belongs to some other
+        # meeting — the same doc would have been caught by the id lookup below.
+        # Letting those into the fuzzy pass is what made a second meeting of
+        # the same day ("... v2") look like a duplicate of the first one, so
+        # the fuzzy fallback only ever sees hand-written or pre-id notes.
+        claimed = set(id_map.values())
+        unclaimed_files = [fp for fp in existing_files if fp not in claimed]
 
         to_create: list[GranolaDocument] = []
         to_update: list[tuple[GranolaDocument, Path]] = []
@@ -227,7 +234,7 @@ class SyncEngine:
 
             date_str = doc.meeting_date.strftime("%Y-%m-%d")
             if fuzzy_match_title(
-                doc.title, date_str, existing_files, self.config.sync.fuzzy_threshold
+                doc.title, date_str, unclaimed_files, self.config.sync.fuzzy_threshold
             ):
                 self.stats.skipped += 1
                 logger.info("Skipped (fuzzy match): %s", doc.title)

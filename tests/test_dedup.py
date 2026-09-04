@@ -94,3 +94,13 @@ def test_fuzzy_match_wrong_date(tmp_path: Path):
     # Different date should not match
     result = fuzzy_match_title("reunion cliente bupa", "2026-02-06", files, threshold=85)
     assert result is None
+
+
+def test_fuzzy_match_disabled_at_zero(tmp_path: Path):
+    files = [tmp_path / "2026-02-06-reunion-cliente-bupa.md"]
+    for f in files:
+        f.write_text("content", encoding="utf-8")
+
+    # Threshold 0 turns the fallback off instead of matching everything
+    result = fuzzy_match_title("reunion cliente bupa", "2026-02-06", files, threshold=0)
+    assert result is None

@@ -22,7 +22,10 @@ owner_emails: []
 # Sync settings
 sync:
   include_transcripts: true
-  fuzzy_threshold: 85        # 0-100 for duplicate title matching
+  # Title similarity used as a duplicate test only against notes with no
+  # granola_id (hand-written or pre-id ones); anything this sync wrote is
+  # matched by id instead. 0 turns the fallback off.
+  fuzzy_threshold: 85
   notes_folder: "Reuniones"  # Obsidian subfolder for synced meeting notes
   transcripts_folder: "Transcripciones"  # where the literal transcripts go
   # separate: the transcript gets its own note and the meeting note keeps a

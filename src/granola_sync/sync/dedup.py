@@ -15,6 +15,8 @@ from pathlib import Path
 import yaml
 from thefuzz import fuzz
 
+from ..constants import TRANSCRIPT_NOTE_TYPE
+
 logger = logging.getLogger(__name__)
 
 
@@ -70,17 +72,28 @@ def scan_vault_for_granola_ids(vault_path: Path) -> dict[str, Path]:
     This allows notes to be moved to any folder (Reuniones, Notas, Recursos,
     Archivo, etc.) while still being detected as duplicates.
 
+    Transcript notes are left out: they carry their meeting's granola_id, and
+    since `Transcripciones` sorts after `Reuniones` they used to win the id and
+    leave the map pointing at the transcript. Callers want the meeting note —
+    it is the one carrying granola_updated and the one to regenerate.
+
     Returns:
-        Dict mapping granola_id → file path.
+        Dict mapping granola_id → meeting note path.
     """
     id_map: dict[str, Path] = {}
     # Skip hidden folders (.obsidian, .trash, etc.)
     for md_file in vault_path.rglob("*.md"):
         if any(part.startswith(".") for part in md_file.relative_to(vault_path).parts):
             continue
-        gid = extract_granola_id(md_file)
-        if gid:
-            id_map[gid] = md_file
+        fm = _parse_frontmatter(md_file)
+        if not fm:
+            continue
+        gid = fm.get("granola_id")
+        if not gid:
+            continue
+        if str(fm.get("type", "")).strip().lower() == TRANSCRIPT_NOTE_TYPE:
+            continue
+        id_map[gid] = md_file
     return id_map
 
 
@@ -96,11 +109,16 @@ def fuzzy_match_title(
         title: The meeting title to match.
         date_str: Date string (YYYY-MM-DD) to filter by.
         existing_files: List of .md file paths to search.
-        threshold: Minimum fuzzy match score (0-100).
+        threshold: Minimum fuzzy match score (1-100). Zero or less turns the
+            fuzzy fallback off entirely, leaving granola_id as the only
+            duplicate test.
 
     Returns:
         The matching file path, or None if no match.
     """
+    if threshold <= 0:
+        return None
+
     best_score = 0
     best_match = None
 

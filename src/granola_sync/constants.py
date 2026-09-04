@@ -13,3 +13,7 @@ DEFAULT_TRANSCRIPTS_FOLDER = "Transcripciones"
 
 # Suffix appended to a note's stem to name its transcript file.
 TRANSCRIPT_SUFFIX = "-transcript"
+
+# Frontmatter `type` of a transcript note. It repeats its meeting's
+# granola_id, so anything that maps ids to notes has to tell the two apart.
+TRANSCRIPT_NOTE_TYPE = "transcripcion"

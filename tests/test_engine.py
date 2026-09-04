@@ -146,3 +146,45 @@ def test_daily_skips_docs_older_than_24h(tmp_path: Path):
 
     assert engine.stats.new == 0
     assert engine.stats.skipped == 1
+
+
+def _write_titled_note(vault: Path, name: str, *, granola_id: str | None) -> Path:
+    notes = vault / "Reuniones"
+    notes.mkdir(parents=True, exist_ok=True)
+    path = notes / f"{name}.md"
+    front = "---\ntype: meeting\n"
+    if granola_id:
+        front += f"granola_id: {granola_id}\n"
+    path.write_text(front + "---\n\nbody\n", encoding="utf-8")
+    return path
+
+
+def test_second_meeting_of_the_day_is_not_a_fuzzy_duplicate(tmp_path: Path):
+    """A near-identical title belonging to another synced meeting is not a dupe."""
+    now = datetime.now(UTC)
+    date_str = now.strftime("%Y-%m-%d")
+    _write_titled_note(tmp_path, f"{date_str}-revision-politica-ia-volcom", granola_id="first")
+
+    doc = _doc("second", created=now, updated=now, title="Revisión Política IA Volcom v2")
+    api = FakeAPI([doc])
+    engine = SyncEngine(_config(tmp_path), api)
+
+    engine.run()
+
+    assert engine.stats.new == 1
+
+
+def test_fuzzy_still_guards_hand_written_notes(tmp_path: Path):
+    """Without a granola_id the note may be a manual one, so the title still counts."""
+    now = datetime.now(UTC)
+    date_str = now.strftime("%Y-%m-%d")
+    _write_titled_note(tmp_path, f"{date_str}-revision-politica-ia-volcom", granola_id=None)
+
+    doc = _doc("second", created=now, updated=now, title="Revisión Política IA Volcom")
+    api = FakeAPI([doc])
+    engine = SyncEngine(_config(tmp_path), api)
+
+    engine.run()
+
+    assert engine.stats.new == 0
+    assert engine.stats.skipped == 1
