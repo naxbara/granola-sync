@@ -1,6 +1,6 @@
 # Avance — Granolaupdater
 
-> Última actualización: 2026-09-04
+> Última actualización: 2026-09-06
 
 Sincroniza las notas de reunión de Granola al vault de Obsidian
 (`Reuniones/` + `Transcripciones/`). Repo: `github.com/naxbara/granola-sync`,
@@ -43,6 +43,29 @@ Sigue vigente; la Fase 6 de arriba se come solo una parte.
 ---
 
 ## Ejecutado
+
+### 2026-09-06
+
+**El cambio de hora corrió el sync una hora, y a las otras cinco tareas
+también.** Chile entró en horario de verano la madrugada del 6-sep (UTC-4 →
+UTC-3) y `GranolaSyncDaily` pasó a correr **22:00 en vez de 21:00**. La causa
+no es de este proyecto sino del cmdlet que usan todos los instaladores:
+`New-ScheduledTaskTrigger -At '21:00'` escribe el `StartBoundary` **en UTC**
+(`2026-09-07T00:00:00Z`), y un boundary con zona ancla la tarea a un instante
+absoluto — el instante se respeta, la hora de reloj no.
+
+- **Las seis tareas reescritas** con el boundary sin zona (`...T21:00:00`), que
+  es como Windows entiende "hora local". Verificado contra el respaldo de cada
+  XML: idénticas salvo la hora — acciones, argumentos, principal y settings
+  intactos.
+- **`scripts/install_scheduled_task.ps1` normaliza el boundary** antes de
+  registrar, para que reinstalar no reintroduzca el desfase. Mismo arreglo en
+  los otros tres instaladores del equipo (DailyDigest ×2, ProfileScout).
+- **Nada se había roto**: las seis se movieron juntas, así que la cadena de los
+  domingos conservó su orden y sus separaciones. El costo real era en abril,
+  cuando se irían para el otro lado.
+- Regla registrada en el vault:
+  `Notas/Decisiones/2026-09-06-las-tareas-programadas-van-en-hora-local.md`.
 
 ### 2026-09-04
 

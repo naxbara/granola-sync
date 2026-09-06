@@ -57,6 +57,11 @@ $psArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$runScript`" -Window $Wind
 
 $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $psArgs -WorkingDirectory $RepoRoot
 $trigger = New-ScheduledTaskTrigger -Daily -At $Time
+# New-ScheduledTaskTrigger emite el StartBoundary en UTC ("...T00:00:00Z"), y
+# un boundary con zona ancla la tarea a un instante absoluto: cuando Chile
+# entra o sale del horario de verano, la tarea se corre una hora de reloj.
+# Sin la zona, Windows lo lee como hora local y la tarea no se mueve.
+$trigger.StartBoundary = ([datetime]$trigger.StartBoundary).ToString('yyyy-MM-ddTHH:mm:ss')
 $settings = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopIfGoingOnBatteries -AllowStartIfOnBatteries
 $principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Limited
 
