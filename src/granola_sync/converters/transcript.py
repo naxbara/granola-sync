@@ -16,6 +16,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from ..constants import TRANSCRIPT_SUFFIX
+from ..utils import to_local
 from .people import Participant, emails, roster
 from .speakers import (
     ATTRIBUTION_CONFIRMED,
@@ -96,7 +97,7 @@ def render_utterances(
     """
     lines: list[str] = ["Transcript:", ""]
     for u in sorted(utterances, key=lambda x: x.start_timestamp):
-        timestamp = u.start_timestamp.strftime("%H:%M:%S")
+        timestamp = to_local(u.start_timestamp).strftime("%H:%M:%S")
         if u.source == "microphone":
             source_label = "You"
         else:

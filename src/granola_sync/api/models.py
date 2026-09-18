@@ -6,6 +6,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from ..utils import to_local
+
 
 class ProseMirrorMark(BaseModel):
     type: str  # "bold", "italic", "link"
@@ -107,14 +109,14 @@ class GranolaDocument(BaseModel):
 
     @property
     def meeting_date(self) -> datetime:
-        """Get the meeting date from calendar event or created_at."""
+        """Meeting start in local time, from the calendar event or created_at."""
         cal = self.google_calendar_event
         if cal and isinstance(cal, dict):
             start = cal.get("start", {})
             dt_str = start.get("dateTime") if isinstance(start, dict) else None
             if dt_str:
-                return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-        return self.created_at
+                return to_local(datetime.fromisoformat(dt_str.replace("Z", "+00:00")))
+        return to_local(self.created_at)
 
     @property
     def duration_minutes(self) -> int | None:

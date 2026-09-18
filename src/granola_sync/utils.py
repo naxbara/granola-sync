@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import platform
+from datetime import UTC, datetime, tzinfo
 from pathlib import Path
 
 from slugify import slugify as _slugify
@@ -11,6 +12,22 @@ from slugify import slugify as _slugify
 def slugify_title(title: str, max_length: int = 80) -> str:
     """Convert a meeting title to a URL/filename-safe slug."""
     return _slugify(title, max_length=max_length, word_boundary=True)
+
+
+# None = the machine's timezone. Tests pin it so they don't depend on where they run.
+LOCAL_TZ: tzinfo | None = None
+
+
+def to_local(dt: datetime) -> datetime:
+    """Convert a datetime to the machine's local timezone.
+
+    Granola returns every timestamp in UTC (``...Z``), calendar starts
+    included, so formatting them as-is shifts every note by the UTC offset
+    and pushes evening meetings to the next day. Naive values are taken as UTC.
+    """
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=UTC)
+    return dt.astimezone(LOCAL_TZ)
 
 
 def generate_filename(title: str, date_str: str, suffix: str = "") -> str:

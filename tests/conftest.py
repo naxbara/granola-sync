@@ -10,6 +10,19 @@ import pytest
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 
 
+@pytest.fixture(autouse=True)
+def _pin_local_timezone(monkeypatch):
+    """Render in UTC by default so results don't depend on the machine's zone.
+
+    Tests that exercise the conversion re-pin it to a real offset.
+    """
+    from datetime import UTC
+
+    from granola_sync import utils
+
+    monkeypatch.setattr(utils, "LOCAL_TZ", UTC)
+
+
 @pytest.fixture
 def sample_prosemirror() -> dict:
     """Load sample ProseMirror document."""

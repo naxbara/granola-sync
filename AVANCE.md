@@ -1,6 +1,6 @@
 # Avance — Granolaupdater
 
-> Última actualización: 2026-09-06
+> Última actualización: 2026-09-17
 
 Sincroniza las notas de reunión de Granola al vault de Obsidian
 (`Reuniones/` + `Transcripciones/`). Repo: `github.com/naxbara/granola-sync`,
@@ -43,6 +43,26 @@ Sigue vigente; la Fase 6 de arriba se come solo una parte.
 ---
 
 ## Ejecutado
+
+### 2026-09-17
+
+**Las horas de las notas venían en UTC (+3/+4 h).** Granola entrega
+`created_at` y los timestamps del transcript en UTC (`...Z`), y el código los
+formateaba con `strftime` sin convertir. Las reuniones con evento de calendario
+salían bien porque ese `dateTime` trae offset (`-03:00`); las **sin calendario**
+(la mitad) quedaban corridas, y las de después de las 20-21 h caían al día
+siguiente — también en el nombre del archivo.
+
+- **`utils.to_local()`**: `meeting_date` y las marcas `[hh:mm:ss]` del
+  transcript pasan por la zona local de la máquina. `utils.LOCAL_TZ` permite
+  fijarla; los tests la fijan en UTC (`conftest.py`) y `test_local_time.py`
+  reproduce el bug con UTC-3. **161 tests.**
+- **Vault corregido** contra la API de Granola como fuente de verdad (verificado
+  con Google Calendar): 281 horas de reunión, marcas de hora de 555
+  transcripciones, y 6 reuniones que cambiaban de día renombradas junto a su
+  transcripción, con los links actualizados en 23 notas. Quedaron 567/567
+  reuniones calzando. Sin tocar: 5 notas cuyo `granola_id` ya no existe en
+  Granola y 2 transcripciones con marcas ambiguas.
 
 ### 2026-09-06
 
