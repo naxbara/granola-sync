@@ -188,3 +188,44 @@ def test_fuzzy_still_guards_hand_written_notes(tmp_path: Path):
 
     assert engine.stats.new == 0
     assert engine.stats.skipped == 1
+
+
+def test_daily_reports_old_note_changed_upstream_without_rewriting(tmp_path: Path):
+    """An old meeting edited in Granola is flagged, never regenerated (enrichment lives there)."""
+    now = datetime.now(UTC)
+    created = now - timedelta(days=10)
+    path = _write_note(tmp_path, "d1", (created + timedelta(hours=1)).isoformat())
+    doc = _doc("d1", created=created, updated=now - timedelta(hours=2))
+    api = FakeAPI([doc])
+    engine = SyncEngine(_config(tmp_path), api)
+
+    engine.run()
+
+    assert engine.stats.stale == ["d1.md"]
+    assert engine.stats.updated == 0
+    assert api.batch_calls == []
+    assert "old body" in path.read_text(encoding="utf-8")
+
+
+def test_daily_does_not_report_old_edits_outside_the_window(tmp_path: Path):
+    now = datetime.now(UTC)
+    created = now - timedelta(days=10)
+    _write_note(tmp_path, "d1", (created + timedelta(hours=1)).isoformat())
+    doc = _doc("d1", created=created, updated=now - timedelta(days=3))
+    engine = SyncEngine(_config(tmp_path), FakeAPI([doc]))
+
+    engine.run()
+
+    assert engine.stats.stale == []
+
+
+def test_daily_does_not_report_unchanged_old_note(tmp_path: Path):
+    now = datetime.now(UTC)
+    created = now - timedelta(days=10)
+    _write_note(tmp_path, "d1", now.isoformat())  # already synced at its latest version
+    doc = _doc("d1", created=created, updated=now - timedelta(hours=2))
+    engine = SyncEngine(_config(tmp_path), FakeAPI([doc]))
+
+    engine.run()
+
+    assert engine.stats.stale == []

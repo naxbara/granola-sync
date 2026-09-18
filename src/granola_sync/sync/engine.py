@@ -51,6 +51,10 @@ class SyncStats:
         self.skipped = 0
         self.errors = 0
         self.verified = 0
+        # Notes whose meeting changed in Granola after the sync window closed.
+        # Reported, never regenerated: a rewrite would drop what enrich-vault
+        # and personas-vault added to the note since.
+        self.stale: list[str] = []
 
     def print_summary(self) -> None:
         table = Table(title="Sync Summary")
@@ -61,7 +65,11 @@ class SyncStats:
         table.add_row("Skipped (duplicates)", str(self.skipped), style="yellow")
         table.add_row("Verified", str(self.verified), style="blue")
         table.add_row("Errors", str(self.errors), style="red" if self.errors else "dim")
+        if self.stale:
+            table.add_row("Changed upstream, not regenerated", str(len(self.stale)), style="yellow")
         console.print(table)
+        for name in self.stale:
+            console.print(f"  [yellow]![/yellow] {name}")
 
 
 class SyncEngine:
@@ -160,7 +168,11 @@ class SyncEngine:
         id_map = scan_vault_for_granola_ids(self.config.vault_path)
         console.print(f"Found {len(docs)} documents, {len(id_map)} already synced\n")
 
-        self._process_new(docs, keep=lambda d: self._as_utc(d.created_at) >= cutoff_24h)
+        self._process_new(
+            docs,
+            keep=lambda d: self._as_utc(d.created_at) >= cutoff_24h,
+            changed=lambda d: self._as_utc(d.updated_at) >= cutoff_24h,
+        )
 
     def _sync_historical(self) -> None:
         """Import all documents from a given date."""
@@ -192,7 +204,7 @@ class SyncEngine:
 
         self._process_new(docs, keep=keep)
 
-    def _process_new(self, docs, keep) -> None:
+    def _process_new(self, docs, keep, changed=None) -> None:
         """Filter docs in the date window, batch-hydrate, and create/update notes.
 
         ``keep`` selects docs in the mode's date window. A doc already in the
@@ -200,6 +212,10 @@ class SyncEngine:
         the note's stored ``granola_updated``; otherwise it is skipped. Fresh
         docs are created. Full content is hydrated in as few batch requests as
         possible (skipped entirely in dry-run).
+
+        ``changed`` (optional) selects docs edited recently. An already-synced
+        doc outside ``keep`` but inside ``changed`` is only reported in
+        ``stats.stale`` — see SyncStats.
         """
         id_map = scan_vault_for_granola_ids(self.config.vault_path)
         notes_dir = self.config.vault_path / self.config.sync.notes_folder
@@ -219,6 +235,8 @@ class SyncEngine:
                 continue
             if not keep(doc):
                 self.stats.skipped += 1
+                if changed is not None and doc.id in id_map and changed(doc):
+                    self._report_if_stale(doc, id_map[doc.id])
                 continue
 
             # Already synced: regenerate only if the source changed since.
@@ -256,6 +274,14 @@ class SyncEngine:
             self._process_document(full_map.get(doc.id, doc))
         for doc, path in to_update:
             self._process_document(full_map.get(doc.id, doc), target_path=path)
+
+    def _report_if_stale(self, doc: GranolaDocument, path: Path) -> None:
+        stored = read_granola_updated(path)
+        if stored is not None and self._as_utc(doc.updated_at) > stored:
+            self.stats.stale.append(path.name)
+            logger.warning(
+                "Changed in Granola after its sync window, not regenerated: %s", path.name
+            )
 
     def _verify(self) -> None:
         """Verify integrity of existing synced notes."""

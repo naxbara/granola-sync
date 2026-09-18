@@ -146,7 +146,8 @@ class AppConfig:
         config.enrichment = EnrichmentConfig(
             enabled=enrich_data.get("enabled", False),
             api_key=enrich_data.get("api_key", ""),
-            model=enrich_data.get("model", "claude-sonnet-4-20250514"),
+            # Default from the dataclass: a second literal here drifted to a retired model.
+            model=enrich_data.get("model", EnrichmentConfig.model),
         )
 
         cal_data = data.get("calendar", {})
