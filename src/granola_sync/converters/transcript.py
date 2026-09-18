@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+from .. import vocab
 from ..constants import TRANSCRIPT_SUFFIX
 from ..utils import to_local
 from .people import Participant, emails, roster
@@ -61,7 +62,7 @@ def _roster_line(participants: list[Participant]) -> str | None:
     # the identity key the vault matches on, this line is for a human.
     seen: set[str] = set()
     once = [p for p in named if not (p.name in seen or seen.add(p.name))]
-    return f"Asistentes: {roster(once)}"
+    return f"{vocab.ACTIVE.attendees}: {roster(once)}"
 
 
 def render_meeting_header(
@@ -142,13 +143,14 @@ def render_transcript_note(
             # keeps saying "Speaker" until a human says otherwise.
             attribution = ATTRIBUTION_SUGGESTED
 
+    v = vocab.ACTIVE
     header = [
         "---",
-        "type: transcripcion",
+        f"type: {v.transcript_type}",
         f"date: '{date_str}'",
         "source: granola",
         f"granola_id: {doc.id}",
-        f'reunion: "[[{note_stem}]]"',
+        f'{v.meeting_key}: "[[{note_stem}]]"',
     ]
     # Only recorded when it says something. Absent means the generic "Speaker",
     # which is also what the migrated transcripts carry.
@@ -166,8 +168,7 @@ def render_transcript_note(
     header += [
         "---",
         "",
-        f"> Transcripcion literal de [[{note_stem}]]. "
-        "Fuera del camino de lectura por defecto.",
+        v.transcript_intro.format(note=note_stem),
         "",
     ]
     body = render_meeting_header(doc, date_str, participants) + render_utterances(
@@ -187,11 +188,11 @@ def render_callout(
     Field order is fixed (Ver -> Granola -> Meeting participants -> Asistentes)
     to match the migrated notes, which end at Meeting participants.
     """
+    v = vocab.ACTIVE
     lines = [
-        "> [!quote]- Transcripcion completa",
-        "> La transcripcion literal de esta reunion vive fuera del camino de lectura",
-        "> por defecto para no pesar en las consultas al vault.",
-        f"> Ver: [[{transcript_stem(note_stem)}]]",
+        v.callout_title,
+        *v.callout_body,
+        f"> {v.see}: [[{transcript_stem(note_stem)}]]",
         f"> Granola: {granola_url(doc.id)}",
     ]
     if participants:

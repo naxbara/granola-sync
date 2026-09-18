@@ -2,13 +2,43 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
 
-from .constants import DEFAULT_NOTES_FOLDER, DEFAULT_TRANSCRIPTS_FOLDER, WORKOS_CLIENT_ID
+from .constants import (
+    DEFAULT_NOTES_FOLDER,
+    DEFAULT_PEOPLE_FOLDER,
+    DEFAULT_TRANSCRIPTS_FOLDER,
+    WORKOS_CLIENT_ID,
+)
 from .utils import credentials_exist, default_credentials_path
+
+logger = logging.getLogger(__name__)
+
+PROFILE_FILE = "vault.yaml"
+
+
+def load_vault_profile(vault_path: Path):
+    """The vault's sc_vault profile, or None to keep this package's own defaults.
+
+    sc_vault is optional: without it (or with a profile that does not load) the
+    sync behaves exactly as before the profile existed. Never raises.
+    """
+    has_file = (vault_path / PROFILE_FILE).exists()
+    try:
+        from sc_vault.profile import VaultProfile
+    except ImportError:
+        if has_file:
+            logger.warning("%s exists but sc_vault is not installed: ignoring it", PROFILE_FILE)
+        return None
+    try:
+        return VaultProfile.load(vault_path)
+    except Exception as exc:  # a broken profile must not stop the sync
+        logger.warning("Could not load %s (%s): using built-in defaults", PROFILE_FILE, exc)
+        return None
 
 
 @dataclass
@@ -17,6 +47,7 @@ class SyncConfig:
     fuzzy_threshold: int = 85
     notes_folder: str = DEFAULT_NOTES_FOLDER
     transcripts_folder: str = DEFAULT_TRANSCRIPTS_FOLDER
+    people_folder: str = DEFAULT_PEOPLE_FOLDER
     # separate: transcript lives in its own note, linked from a callout.
     # inline: legacy behaviour, transcript embedded in the meeting note.
     transcript_mode: str = "separate"
@@ -96,6 +127,11 @@ class AppConfig:
     # without guessing.
     owner_emails: list[str] = field(default_factory=list)
 
+    # From the vault profile: the language of the words written into notes (see
+    # vocab.py) and the zone meeting times are shown in (None = the machine's).
+    language: str = "es"
+    timezone: str | None = None
+
     # Directory relative paths resolve against: the config file's own folder,
     # so a scheduled run behaves the same whatever the working directory is.
     base_dir: Path = field(default_factory=lambda: Path.cwd())
@@ -125,9 +161,16 @@ class AppConfig:
         if "workos_client_id" in data:
             config.workos_client_id = data["workos_client_id"]
 
+        # Precedence: this config.yaml > the vault profile > built-in defaults.
+        profile = load_vault_profile(config.vault_path)
+        folders = profile.folders if profile else None
+        if profile:
+            config.language = profile.language
+            config.timezone = profile.timezone
+
         config.owner_emails = [
             str(email).strip().lower()
-            for email in (data.get("owner_emails") or [])
+            for email in (data.get("owner_emails") or (profile.owner.emails if profile else []))
             if str(email).strip()
         ]
 
@@ -135,9 +178,15 @@ class AppConfig:
         config.sync = SyncConfig(
             include_transcripts=sync_data.get("include_transcripts", True),
             fuzzy_threshold=sync_data.get("fuzzy_threshold", 85),
-            notes_folder=sync_data.get("notes_folder", DEFAULT_NOTES_FOLDER),
+            notes_folder=sync_data.get(
+                "notes_folder", folders.meetings if folders else DEFAULT_NOTES_FOLDER
+            ),
             transcripts_folder=sync_data.get(
-                "transcripts_folder", DEFAULT_TRANSCRIPTS_FOLDER
+                "transcripts_folder",
+                folders.transcripts if folders else DEFAULT_TRANSCRIPTS_FOLDER,
+            ),
+            people_folder=sync_data.get(
+                "people_folder", folders.people if folders else DEFAULT_PEOPLE_FOLDER
             ),
             transcript_mode=sync_data.get("transcript_mode", "separate"),
         )

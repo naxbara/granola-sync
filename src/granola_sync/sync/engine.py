@@ -12,11 +12,13 @@ from __future__ import annotations
 import logging
 import re
 from datetime import UTC, datetime, timedelta
+from zoneinfo import ZoneInfo
 from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.table import Table
 
+from .. import utils, vocab
 from ..api.models import GranolaDocument
 from ..converters import people
 from ..converters.html import html_to_markdown
@@ -85,6 +87,11 @@ class SyncEngine:
         self.api = api
         self.enricher = enricher
         self.converter = ProseMirrorToMarkdown()
+        # The vault's language picks the words written into notes. An explicit
+        # timezone overrides the machine's; without one, LOCAL_TZ is left alone.
+        vocab.use(config.language)
+        if config.timezone:
+            utils.LOCAL_TZ = ZoneInfo(config.timezone)
         self.stats = SyncStats()
         # Participant sources are built on first use: dry-run must not
         # authenticate against Calendar or walk the vault for nothing.
@@ -95,7 +102,9 @@ class SyncEngine:
     def _participants(self, doc: GranolaDocument) -> list[people.Participant]:
         """Who attended, from Granola, then Calendar, then the vault."""
         if self._personas is None:
-            self._personas = PersonasIndex.from_vault(self.config.vault_path)
+            self._personas = PersonasIndex.from_vault(
+                self.config.vault_path, self.config.sync.people_folder
+            )
             logger.debug("Indexed %d addresses from Personas/", len(self._personas))
 
         if not self._calendar_ready:
@@ -311,7 +320,8 @@ class SyncEngine:
         link there means the transcript was lost, which the body check above
         cannot see.
         """
-        match = re.search(r"^> Ver: \[\[([^\]]+)\]\]", content, re.M)
+        see = re.escape(vocab.ACTIVE.see)
+        match = re.search(rf"^> {see}: \[\[([^\]]+)\]\]", content, re.M)
         if not match:
             return None
         target = (

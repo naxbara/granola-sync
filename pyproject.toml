@@ -33,6 +33,12 @@ calendar = [
     "google-api-python-client>=2.100",
     "google-auth-oauthlib>=1.2",
 ]
+# Reads <vault>/vault.yaml (folders, owner, language, timezone). Optional: without
+# it the sync keeps its built-in defaults. tzdata backs zoneinfo on Windows.
+profile = [
+    "sc-vault @ git+https://github.com/naxbara/segundo-cerebro.git#subdirectory=packages/sc-vault",
+    'tzdata; sys_platform == "win32"',
+]
 
 [project.scripts]
 granola-sync = "granola_sync.cli:main"

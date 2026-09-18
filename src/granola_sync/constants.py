@@ -11,9 +11,11 @@ DEFAULT_NOTES_FOLDER = "Reuniones"
 # Default subfolder for the literal transcripts, kept out of the reading path.
 DEFAULT_TRANSCRIPTS_FOLDER = "Transcripciones"
 
+# Default subfolder of the person notes used to name attendees.
+DEFAULT_PEOPLE_FOLDER = "Personas"
+
 # Suffix appended to a note's stem to name its transcript file.
 TRANSCRIPT_SUFFIX = "-transcript"
 
-# Frontmatter `type` of a transcript note. It repeats its meeting's
-# granola_id, so anything that maps ids to notes has to tell the two apart.
-TRANSCRIPT_NOTE_TYPE = "transcripcion"
+# The frontmatter `type` of a transcript note depends on the vault language:
+# see vocab.Vocab.transcript_type.

@@ -24,6 +24,8 @@ import unicodedata
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from .. import vocab
+
 if TYPE_CHECKING:
     from ..api.models import TranscriptUtterance
     from .people import Participant, PersonasIndex
@@ -71,8 +73,9 @@ class Candidate:
     ambiguous: bool   # the same token matches more than one person
 
     def evidence(self) -> str:
-        base = f"'{self.key}' en el título y {self.mentions}× en la transcripción"
-        return f"{base} (el apellido matchea más de una ficha)" if self.ambiguous else base
+        v = vocab.ACTIVE
+        base = v.evidence.format(key=self.key, mentions=self.mentions)
+        return base + v.evidence_ambiguous if self.ambiguous else base
 
 
 def resolve_speaker(

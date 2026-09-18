@@ -15,7 +15,7 @@ from pathlib import Path
 import yaml
 from thefuzz import fuzz
 
-from ..constants import TRANSCRIPT_NOTE_TYPE
+from .. import vocab
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ def scan_vault_for_granola_ids(vault_path: Path) -> dict[str, Path]:
         gid = fm.get("granola_id")
         if not gid:
             continue
-        if str(fm.get("type", "")).strip().lower() == TRANSCRIPT_NOTE_TYPE:
+        if str(fm.get("type", "")).strip().lower() == vocab.ACTIVE.transcript_type:
             continue
         id_map[gid] = md_file
     return id_map

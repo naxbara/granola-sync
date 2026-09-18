@@ -64,6 +64,28 @@ siguiente — también en el nombre del archivo.
   reuniones calzando. Sin tocar: 5 notas cuyo `granola_id` ya no existe en
   Granola y 2 transcripciones con marcas ambiguas.
 
+**Plan Segundo Cerebro (producto), Fase 0 y tramo 2 de la Fase 1** (el plan
+vive en el vault: `Planes/Plan-Producto-Segundo-Cerebro-Sep2026.md`):
+
+- **Aviso de reuniones viejas editadas en Granola** (`93ef586`): el sync
+  diario las lista en `stats.stale` y en el log **sin reescribirlas**, porque
+  una actualización pisa la nota entera y borraría el enriquecimiento. El
+  modelo por defecto de `enrichment` sale del dataclass; `test_config.py`
+  compara los defaults de todas las secciones por introspección.
+- **Golden de un sync completo** (`7d543a0`): `tests/fixtures/golden_sync/`,
+  nota + transcripción byte a byte. Regenerar solo a propósito con
+  `UPDATE_GOLDEN=1`.
+- **El sync lee el perfil del vault** (`<vault>/vault.yaml`, paquete
+  `sc_vault` del repo `segundo-cerebro`), sin commit todavía. Precedencia
+  `config.yaml` > perfil > defaults. Toma carpetas (reuniones,
+  transcripciones, `people_folder` nuevo), correos del dueño, idioma y zona
+  horaria. Las palabras que el sync escribe en las notas pasan a `vocab.py`
+  (es copiado literal, en nuevo). **`sc_vault` es opcional** (extra
+  `profile`): sin él, o con un perfil roto, todo queda como antes. Verificado:
+  el `config.yaml` real da la misma configuración con y sin `sc_vault`, y un
+  dry-run real no muestra cambios. **Producción no tiene `sc_vault`
+  instalado** — eso llega con el tramo 5, con confirmación. **184 tests.**
+
 ### 2026-09-06
 
 **El cambio de hora corrió el sync una hora, y a las otras cinco tareas
