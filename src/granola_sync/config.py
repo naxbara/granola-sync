@@ -98,6 +98,10 @@ class IndicesConfig:
     """
 
     enabled: bool = False
+    # Which generator builds them: "script" (the vault's own script, below),
+    # "sc_vault" (`python -m sc_vault indices`, same output behind the vault
+    # profile) or "auto" (sc_vault when it is installed, else the script).
+    engine: str = "script"
     # Path to the generator, relative to the vault (or absolute).
     script: str = "Recursos/segundo-cerebro/generar-indices.py"
     timeout_seconds: int = 180
@@ -212,6 +216,7 @@ class AppConfig:
         idx_data = data.get("indices", {})
         config.indices = IndicesConfig(
             enabled=idx_data.get("enabled", False),
+            engine=idx_data.get("engine", "script"),
             script=idx_data.get(
                 "script", "Recursos/segundo-cerebro/generar-indices.py"
             ),

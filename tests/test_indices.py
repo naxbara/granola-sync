@@ -31,6 +31,7 @@ def _config(vault: Path, **kwargs) -> AppConfig:
     config.vault_path = vault
     config.indices = IndicesConfig(
         enabled=kwargs.pop("enabled", True),
+        engine=kwargs.pop("engine", "script"),
         script=kwargs.pop("script", f"Recursos/segundo-cerebro/{SCRIPT_NAME}"),
         timeout_seconds=kwargs.pop("timeout_seconds", 180),
     )
@@ -160,3 +161,51 @@ def test_uses_the_running_interpreter(vault: Path):
     )
     regenerate(_config(vault), wrote_notes=True)
     assert out.read_text(encoding="utf-8") == sys.executable
+
+
+# --- engine: script | sc_vault | auto -------------------------------------
+
+
+def _capture_cmd(monkeypatch) -> list:
+    seen: list = []
+
+    def _run(cmd, **kwargs):
+        seen.append(cmd)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(subprocess, "run", _run)
+    return seen
+
+
+def test_engine_sc_vault_runs_the_module(vault: Path, monkeypatch):
+    monkeypatch.setattr("granola_sync.sync.indices._sc_vault_installed", lambda: True)
+    seen = _capture_cmd(monkeypatch)
+    result = regenerate(_config(vault, engine="sc_vault"), wrote_notes=True)
+    assert result.ok
+    assert seen == [[sys.executable, "-m", "sc_vault", "indices", "--vault", str(vault), "--apply"]]
+
+
+def test_engine_sc_vault_not_installed_is_reported(vault: Path, monkeypatch):
+    monkeypatch.setattr("granola_sync.sync.indices._sc_vault_installed", lambda: False)
+    result = regenerate(_config(vault, engine="sc_vault"), wrote_notes=True)
+    assert result.failed and "not installed" in result.reason
+
+
+def test_engine_auto_prefers_sc_vault(vault: Path, monkeypatch):
+    monkeypatch.setattr("granola_sync.sync.indices._sc_vault_installed", lambda: True)
+    seen = _capture_cmd(monkeypatch)
+    regenerate(_config(vault, engine="auto"), wrote_notes=True)
+    assert seen[0][1:3] == ["-m", "sc_vault"]
+
+
+def test_engine_auto_falls_back_to_the_script(vault: Path, monkeypatch):
+    monkeypatch.setattr("granola_sync.sync.indices._sc_vault_installed", lambda: False)
+    script = _write_script(vault, "raise SystemExit(0)")
+    seen = _capture_cmd(monkeypatch)
+    regenerate(_config(vault, engine="auto"), wrote_notes=True)
+    assert seen[0][1] == str(script)
+
+
+def test_unknown_engine_is_reported(vault: Path):
+    result = regenerate(_config(vault, engine="magic"), wrote_notes=True)
+    assert result.failed and "unknown indices.engine" in result.reason

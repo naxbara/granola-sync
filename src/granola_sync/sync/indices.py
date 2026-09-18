@@ -17,6 +17,7 @@ Two rules shape this module:
 
 from __future__ import annotations
 
+import importlib.util
 import logging
 import subprocess
 import sys
@@ -44,6 +45,26 @@ def _resolve_script(vault_path: Path, script: str) -> Path:
     return candidate if candidate.is_absolute() else vault_path / candidate
 
 
+def _sc_vault_installed() -> bool:
+    return importlib.util.find_spec("sc_vault") is not None
+
+
+def _command(config) -> tuple[list[str] | None, str]:
+    """The generator command for `indices.engine`, or (None, why it cannot run)."""
+    engine = (config.indices.engine or "script").lower()
+    if engine not in ("script", "sc_vault", "auto"):
+        return None, f"unknown indices.engine: {engine!r} (use script, sc_vault or auto)"
+    vault = str(config.vault_path)
+    if engine == "sc_vault" or (engine == "auto" and _sc_vault_installed()):
+        if not _sc_vault_installed():
+            return None, "indices.engine is sc_vault but sc_vault is not installed"
+        return [sys.executable, "-m", "sc_vault", "indices", "--vault", vault, "--apply"], ""
+    script = _resolve_script(config.vault_path, config.indices.script)
+    if not script.is_file():
+        return None, f"index generator not found: {script}"
+    return [sys.executable, str(script), "--vault", vault, "--apply"], ""
+
+
 def regenerate(config, wrote_notes: bool) -> IndicesResult:
     """Run the index generator. Returns what happened; never raises."""
     if not config.indices.enabled:
@@ -55,19 +76,11 @@ def regenerate(config, wrote_notes: bool) -> IndicesResult:
     if not wrote_notes:
         return IndicesResult(ran=False, reason="no notes written")
 
-    script = _resolve_script(config.vault_path, config.indices.script)
-    if not script.is_file():
-        msg = f"index generator not found: {script}"
-        logger.warning(msg)
-        return IndicesResult(ran=True, ok=False, reason=msg)
+    cmd, why_not = _command(config)
+    if cmd is None:
+        logger.warning(why_not)
+        return IndicesResult(ran=True, ok=False, reason=why_not)
 
-    cmd = [
-        sys.executable,
-        str(script),
-        "--vault",
-        str(config.vault_path),
-        "--apply",
-    ]
     logger.info("Regenerating vault indexes: %s", " ".join(cmd))
 
     try:

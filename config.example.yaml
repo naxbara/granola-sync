@@ -46,6 +46,7 @@ enrichment:
 # fails the sync, and it is skipped on dry-run or when nothing was written.
 indices:
   enabled: false
+  engine: script     # script | sc_vault (python -m sc_vault indices) | auto (sc_vault if installed)
   script: "Recursos/segundo-cerebro/generar-indices.py"  # relative to the vault
   timeout_seconds: 180
 

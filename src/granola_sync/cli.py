@@ -170,7 +170,8 @@ def main() -> None:
             console.print(
                 f"[yellow]Warning:[/yellow] {idx.reason}\n"
                 "[dim]The sync itself is fine. Rebuild them with: "
-                "python Recursos/segundo-cerebro/generar-indices.py --vault . --apply[/dim]"
+                "python -m sc_vault indices --vault . --apply "
+                "(or python Recursos/segundo-cerebro/generar-indices.py --vault . --apply)[/dim]"
             )
 
         console.print(f"\n[dim]Log file: {log_file}[/dim]")
