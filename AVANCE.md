@@ -30,8 +30,9 @@ perdiendo (la línea `Meeting participants:` cayó de 34/51 notas en abril a
       dominios de los asistentes. **Es la que cierra el pedido original**
 - [ ] **Fase 5 — Skills del vault.** `enrich-vault`, `personas-vault`,
       `mantenimiento-vault` y los zips de Cowork, atrasados 4-6 semanas
-- [ ] **Fase 6 — Higiene del repo.** Bug 1a del PLAN ronda 2 (modelo
-      descontinuado como fallback), limpiar los `*.bak-migracion`
+- [ ] **Fase 6 — Higiene del repo.** ~~Bug 1a del PLAN ronda 2 (modelo
+      descontinuado como fallback)~~ — *resuelto el 2026-09-17 (`93ef586`)*;
+      falta limpiar los `*.bak-migracion`
 
 ### Ronda 2 — pendiente desde 2026-07-05
 
@@ -76,7 +77,7 @@ vive en el vault: `Planes/Plan-Producto-Segundo-Cerebro-Sep2026.md`):
   nota + transcripción byte a byte. Regenerar solo a propósito con
   `UPDATE_GOLDEN=1`.
 - **El sync lee el perfil del vault** (`<vault>/vault.yaml`, paquete
-  `sc_vault` del repo `segundo-cerebro`), sin commit todavía. Precedencia
+  `sc_vault` del repo `segundo-cerebro`), commit `e2e3212`. Precedencia
   `config.yaml` > perfil > defaults. Toma carpetas (reuniones,
   transcripciones, `people_folder` nuevo), correos del dueño, idioma y zona
   horaria. Las palabras que el sync escribe en las notas pasan a `vocab.py`
@@ -234,10 +235,13 @@ tocó en ningún momento.
 
 ## Próximos pasos
 
-1. **Confirmar la hora local en la corrida nocturna del 2026-09-17** (21:00):
-   las notas nuevas sin evento de calendario tienen que traer `time:` y las
-   marcas `[hh:mm:ss]` en hora de Chile. Revisar las 5 notas huérfanas de
-   Granola y las 2 transcripciones ambiguas del 17-sep a mano, si importan.
+1. **Hora local — confirmada el 2026-09-17** contra la API: las 7 reuniones
+   de las últimas 36 h traen fecha y hora en UTC-3. Quedan a mano, si
+   importan, las 5 notas huérfanas de Granola y las 2 transcripciones
+   ambiguas.
+1b. **Tramo 5 del plan de producto** (con confirmación): instalar el extra
+   `profile` (`pip install -e ".[profile]"`) en el Python del sync y crear el
+   `vault.yaml` real. Hasta entonces el perfil no se lee en producción.
 2. **Fase 4 — empresas sin asumir.** Es lo que originalmente pidió Sebastián y
    ahora tiene los insumos que le faltaban: dominios de correo reales y fichas
    de `Personas/` cruzadas. Detectar y marcar (`orgs_sin_respaldo`), nunca
@@ -249,7 +253,8 @@ tocó en ningún momento.
    que se implementó no llegaron notas nuevas.
 4. **Ver un `Update queued` real.** La vía de actualización estuvo muerta desde
    agosto por el mapa de ids: hay que confirmar en una corrida nocturna que una
-   reunión editada en Granola se regenera de verdad. Ojo con el otro lado de lo
+   reunión editada en Granola **dentro de sus primeras 24 h** se regenera de
+   verdad (las más viejas ahora solo se avisan, ver Decisiones). Ojo con el otro lado de lo
    mismo: un `--mode=historical` sobre el histórico ahora **sí** puede
    reescribir notas viejas editadas a mano. Antes de correrlo, dry-run.
 5. Fase 5 (skills) y Fase 6 (higiene del repo).
@@ -258,6 +263,17 @@ tocó en ningún momento.
 
 ## Decisiones y bloqueos
 
+- **2026-09-17 — Una reunión vieja editada en Granola se avisa, no se
+  regenera.** Regenerar pisa la nota entera y borra lo que agregaron
+  `enrich-vault` y `personas-vault`; las 2 detectadas ese día estaban
+  enriquecidas. Registrada en el vault:
+  `Notas/Decisiones/2026-09-17-un-cambio-en-granola-no-reescribe-una-nota-enriquecida.md`.
+- **2026-09-17 — El perfil del vault es opcional y nunca manda sobre
+  `config.yaml`.** Sin `sc_vault`, o con un `vault.yaml` roto, el sync queda
+  idéntico. Las palabras que otras herramientas buscan literalmente (`> Ver:`,
+  el título del callout) cambian solo junto con el idioma del vault. Registrada
+  en el vault:
+  `Notas/Decisiones/2026-09-17-la-identidad-del-dueno-vive-en-vault-yaml-no-en-el-codigo.md`.
 - **2026-09-17 — La hora se convierte a la zona de la máquina, no a una zona
   fija en el config.** Windows y Mac corren en hora de Chile, y la zona del
   sistema sigue sola los cambios de hora. `utils.LOCAL_TZ` queda como punto
