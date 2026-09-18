@@ -212,7 +212,11 @@ tocó en ningún momento.
 
 ## Próximos pasos
 
-1. **Fase 4 — empresas sin asumir.** Es lo que originalmente pidió Sebastián y
+1. **Confirmar la hora local en la corrida nocturna del 2026-09-17** (21:00):
+   las notas nuevas sin evento de calendario tienen que traer `time:` y las
+   marcas `[hh:mm:ss]` en hora de Chile. Revisar las 5 notas huérfanas de
+   Granola y las 2 transcripciones ambiguas del 17-sep a mano, si importan.
+2. **Fase 4 — empresas sin asumir.** Es lo que originalmente pidió Sebastián y
    ahora tiene los insumos que le faltaban: dominios de correo reales y fichas
    de `Personas/` cruzadas. Detectar y marcar (`orgs_sin_respaldo`), nunca
    reescribir el cuerpo — **hay reuniones que sí son de Kauel**.
@@ -232,6 +236,12 @@ tocó en ningún momento.
 
 ## Decisiones y bloqueos
 
+- **2026-09-17 — La hora se convierte a la zona de la máquina, no a una zona
+  fija en el config.** Windows y Mac corren en hora de Chile, y la zona del
+  sistema sigue sola los cambios de hora. `utils.LOCAL_TZ` queda como punto
+  para fijarla (lo usan los tests). Ojo en cualquier script que lea la API de
+  Granola: `created_at` y los timestamps vienen en UTC; solo el `dateTime` del
+  calendario trae offset.
 - **2026-09-04 — El fuzzy de títulos no se apagó, se acotó.** Subir el umbral
   no arreglaba nada: un sufijo "v2" puntúa ≈95 y habría que exigir títulos
   idénticos. Apagarlo del todo dejaba sin red las notas hechas a mano. Se optó
