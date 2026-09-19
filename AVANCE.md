@@ -1,6 +1,6 @@
 # Avance — Granolaupdater
 
-> Última actualización: 2026-09-18
+> Última actualización: 2026-09-19
 
 Sincroniza las notas de reunión de Granola al vault de Obsidian
 (`Reuniones/` + `Transcripciones/`). Repo: `github.com/naxbara/granola-sync`,
@@ -44,6 +44,11 @@ Sigue vigente; la Fase 6 de arriba se come solo una parte.
 ---
 
 ## Ejecutado
+
+### 2026-09-19
+
+- **Este paquete entra en la beta 0 de Segundo Cerebro** como wheel (`granola-obsidian-sync`), y `sc run granola` lo llama con una config propia (sin enriquecimiento, índices con `sc_vault`). Probado en un entorno limpio: `--mode historical` importó 21 reuniones a un vault nuevo sin errores.
+- **Comentarios con nombres reales reemplazados por ejemplos genéricos** (`1c5ce13`): el escaneo del build de la beta encontró el nombre del dueño, un cliente y un socio como ejemplos de calibración en `config.py`, `speakers.py` y `engine.py`. Solo comentarios; 189 tests sin cambios.
 
 ### 2026-09-18
 
