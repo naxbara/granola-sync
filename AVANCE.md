@@ -1,6 +1,6 @@
 # Avance — Granolaupdater
 
-> Última actualización: 2026-09-17
+> Última actualización: 2026-09-18
 
 Sincroniza las notas de reunión de Granola al vault de Obsidian
 (`Reuniones/` + `Transcripciones/`). Repo: `github.com/naxbara/granola-sync`,
@@ -45,6 +45,21 @@ Sigue vigente; la Fase 6 de arriba se come solo una parte.
 
 ## Ejecutado
 
+### 2026-09-18
+
+- **`indices.engine`** (`59862ae`): elige quién regenera `Indices/` al final
+  del sync — `script` (default, el generador del vault), `sc_vault`
+  (`python -m sc_vault indices`, misma salida detrás del perfil del vault) o
+  `auto` (`sc_vault` si está instalado, si no el script). Un `sc_vault`
+  ausente o un engine desconocido se reportan como cualquier otra falla: nunca
+  tumban el sync. 5 tests nuevos, **189 tests**.
+- **Producción usa `sc_vault`** (tramo 5 del plan Segundo Cerebro, 21:30):
+  `sc_vault` instalado editable en `C:\Python314`, `<vault>/vault.yaml` con el
+  perfil real y `indices.engine: auto` en el `config.yaml` real. Verificado:
+  el perfil carga (dueño + 6 correos) y `--mode=dry-run` corre sin errores
+  sobre los 570 documentos. Paso atrás si algo falla: `indices.engine: script`
+  y borrar `<vault>/vault.yaml`.
+
 ### 2026-09-17
 
 **Las horas de las notas venían en UTC (+3/+4 h).** Granola entrega
@@ -84,8 +99,8 @@ vive en el vault: `Planes/Plan-Producto-Segundo-Cerebro-Sep2026.md`):
   (es copiado literal, en nuevo). **`sc_vault` es opcional** (extra
   `profile`): sin él, o con un perfil roto, todo queda como antes. Verificado:
   el `config.yaml` real da la misma configuración con y sin `sc_vault`, y un
-  dry-run real no muestra cambios. **Producción no tiene `sc_vault`
-  instalado** — eso llega con el tramo 5, con confirmación. **184 tests.**
+  dry-run real no muestra cambios. Producción no tenía `sc_vault`
+  instalado hasta el tramo 5 (18-sep, ver arriba). **184 tests.**
 
 ### 2026-09-06
 
