@@ -122,7 +122,7 @@ class SyncEngine:
     def _owner_names(self) -> set[str]:
         """What the vault calls the owner, so suggestions skip their own name.
 
-        It shows up in every transcript — people say "Sebastián" constantly —
+        It shows up in every transcript — people say the owner's name constantly —
         and would otherwise be the loudest candidate in the room.
         """
         names = set()

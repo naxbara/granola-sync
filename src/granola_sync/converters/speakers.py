@@ -107,8 +107,9 @@ def _keys_for(name: str) -> list[str]:
     """The ways a person actually gets referred to out loud.
 
     A meeting titled by surname is often spoken by first name, and the other
-    way round: "JC Lanas y Gustavo" never says "Lanas" once, but says "Juan
-    Carlos" eighteen times. Searching only the full name misses both.
+    way round: a meeting titled with initials and a surname never says the
+    surname once, but says the first name eighteen times. Searching only the
+    full name misses both.
 
     The given-name part is kept whole ("juan carlos") rather than split into
     bare tokens, because "juan" on its own matches half of Chile.

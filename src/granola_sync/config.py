@@ -77,8 +77,8 @@ class CalendarConfig:
     match_window_minutes: int = 30
     # Minimum fuzzy score between the meeting title and the event summary.
     # 55 comes from measurement, not taste: over a real week the correct but
-    # loosely-named match scored 59 ("Geovita presentación" vs "Geovitas y
-    # Sebastián Suárez") while the best *wrong* candidate scored 38, so this
+    # loosely-named match scored 59 (a client's name in the title vs the client
+    # plus the owner's full name in the event) while the best *wrong* candidate scored 38, so this
     # sits in the gap with room on both sides.
     title_threshold: int = 55
 
