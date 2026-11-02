@@ -10,9 +10,14 @@ Two rules shape this module:
 
 1. **It never fails the sync.** The notes are the product; the indexes are
    derived and can be rebuilt by hand at any time. A missing script, a crash or
-   a timeout is reported and the sync still exits successfully.
+   a timeout is reported and every note is still written. The CLI does exit
+   with code 3 then, so the scheduler and the digest's alert see it: a warning
+   inside a log nobody reads is how the 2026-10-30 failure went unnoticed.
 2. **It only runs when something changed.** No new or updated notes, or a
-   dry-run, means the indexes already match the vault.
+   dry-run, means the indexes already match the vault — unless the last
+   attempt failed: then a marker file stays behind and the next sync retries
+   even with nothing new. On 2026-10-30 a failure was followed by two quiet
+   days, and nothing tried again until the indexes were rebuilt by hand.
 """
 
 from __future__ import annotations
@@ -21,7 +26,7 @@ import importlib.util
 import logging
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -34,6 +39,9 @@ class IndicesResult:
     ran: bool
     ok: bool = False
     reason: str = ""
+    # What the generator said on stderr while still succeeding (e.g. a note it
+    # could not open and skipped). Worth showing: the index is missing it.
+    warnings: list[str] = field(default_factory=list)
 
     @property
     def failed(self) -> bool:
@@ -65,17 +73,43 @@ def _command(config) -> tuple[list[str] | None, str]:
     return [sys.executable, str(script), "--vault", vault, "--apply"], ""
 
 
-def regenerate(config, wrote_notes: bool) -> IndicesResult:
-    """Run the index generator. Returns what happened; never raises."""
+def regenerate(config, wrote_notes: bool, pending: Path | None = None) -> IndicesResult:
+    """Run the index generator. Returns what happened; never raises.
+
+    `pending` is the marker of a failed attempt: written on failure, removed on
+    success, and while it exists the generator runs even if no notes were written.
+    """
     if not config.indices.enabled:
         return IndicesResult(ran=False, reason="disabled in config")
 
     if config.dry_run:
         return IndicesResult(ran=False, reason="dry-run")
 
-    if not wrote_notes:
+    retrying = pending is not None and pending.exists()
+    if not wrote_notes and not retrying:
         return IndicesResult(ran=False, reason="no notes written")
+    if retrying and not wrote_notes:
+        logger.info("Retrying the index regeneration that failed last time")
 
+    result = _run(config)
+    if pending is not None:
+        _mark(pending, result)
+    return result
+
+
+def _mark(pending: Path, result: IndicesResult) -> None:
+    """Leave or clear the failure marker. Best-effort, like everything here."""
+    try:
+        if result.failed:
+            pending.parent.mkdir(parents=True, exist_ok=True)
+            pending.write_text(result.reason + "\n", encoding="utf-8")
+        elif result.ok:
+            pending.unlink(missing_ok=True)
+    except OSError as e:
+        logger.warning("could not update %s: %s", pending, e)
+
+
+def _run(config) -> IndicesResult:
     cmd, why_not = _command(config)
     if cmd is None:
         logger.warning(why_not)
@@ -110,5 +144,8 @@ def regenerate(config, wrote_notes: bool) -> IndicesResult:
         logger.warning("%s\n%s", msg, proc.stderr)
         return IndicesResult(ran=True, ok=False, reason=msg)
 
+    warnings = [line for line in (proc.stderr or "").strip().splitlines() if line.strip()]
+    for line in warnings:
+        logger.warning("index generator: %s", line)
     logger.info("Vault indexes regenerated")
-    return IndicesResult(ran=True, ok=True)
+    return IndicesResult(ran=True, ok=True, warnings=warnings)

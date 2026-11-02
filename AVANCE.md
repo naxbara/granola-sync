@@ -1,6 +1,6 @@
 # Avance — Granolaupdater
 
-> Última actualización: 2026-09-19
+> Última actualización: 2026-11-02
 
 Sincroniza las notas de reunión de Granola al vault de Obsidian
 (`Reuniones/` + `Transcripciones/`). Repo: `github.com/naxbara/granola-sync`,
@@ -44,6 +44,14 @@ Sigue vigente; la Fase 6 de arriba se come solo una parte.
 ---
 
 ## Ejecutado
+
+### 2026-11-02
+
+- **Si el índice falla, se reintenta y se avisa.** El 30-oct el sync escribió las reuniones, pero `sc_vault` no pudo regenerar `Indices/`: un clipping tenía una ruta de 302 caracteres (arreglado en `segundo-cerebro` `46bf9b4`). El error quedó como un WARNING en el log y el digest dijo `"sync":"ok"`. Además, el fin de semana nadie lo reintentó, porque sin notas nuevas el sync no regenera.
+  - **Reintento**: cuando la regeneración falla queda `logs/indices_pending`. Mientras exista, el sync siguiente regenera aunque no haya escrito notas, y la marca se borra cuando sale bien.
+  - **Código de salida 3**: las notas se escriben igual, pero el CLI termina con `3`. Así la tarea programada aparece con error y el digest marca `sync: error: exit code 3`, lo que dispara su alerta por correo. **También afecta a `cerebro run granola` de la beta**, que lo reporta como error cuando se reconstruya el zip.
+  - **Avisos en una corrida que sale bien**: lo que el generador escribe en stderr (por ejemplo, `skipped unreadable note`) queda en el log y en pantalla. Antes se descartaba.
+  - 6 tests nuevos en `test_indices.py`, **195 en verde**. La salida con código 3 del CLI no tiene test propio.
 
 ### 2026-09-19
 

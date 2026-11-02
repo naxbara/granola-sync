@@ -8,8 +8,14 @@ from pathlib import Path
 
 import httpx
 from rich.console import Console
+from rich.markup import escape
 
 console = Console()
+
+# The sync wrote every note but the vault's indexes could not be rebuilt.
+EXIT_INDICES_FAILED = 3
+# Marker of that failure, next to the logs; while it exists the next sync retries.
+INDICES_PENDING = "indices_pending"
 
 
 def main() -> None:
@@ -163,9 +169,15 @@ def main() -> None:
         # failure here is reported but never fails the sync.
         from .sync.indices import regenerate as regenerate_indices
 
-        idx = regenerate_indices(config, wrote_notes=bool(stats.new or stats.updated))
+        idx = regenerate_indices(
+            config,
+            wrote_notes=bool(stats.new or stats.updated),
+            pending=log_dir / INDICES_PENDING,
+        )
         if idx.ok:
             console.print("[dim]Vault indexes regenerated[/dim]")
+            for line in idx.warnings:
+                console.print(f"[yellow]Index warning:[/yellow] {escape(line)}")
         elif idx.failed:
             console.print(
                 f"[yellow]Warning:[/yellow] {idx.reason}\n"
@@ -179,6 +191,10 @@ def main() -> None:
         # Exit with error code if there were errors
         if stats.errors > 0:
             sys.exit(1)
+        # Notes are fine, indexes are stale: a code of its own so the
+        # scheduler and the digest's alert notice (see sync/indices.py).
+        if idx.failed:
+            sys.exit(EXIT_INDICES_FAILED)
 
     except FileNotFoundError as e:
         console.print(f"\n[red]Error:[/red] {e}")

@@ -163,6 +163,64 @@ def test_uses_the_running_interpreter(vault: Path):
     assert out.read_text(encoding="utf-8") == sys.executable
 
 
+# --- a failed attempt is retried ------------------------------------------
+
+
+def test_failure_leaves_a_marker(vault: Path):
+    pending = vault / "logs" / "indices_pending"
+    _write_script(vault, "raise SystemExit(2)")
+    result = regenerate(_config(vault), wrote_notes=True, pending=pending)
+    assert result.failed
+    assert pending.exists()
+
+
+def test_marker_retries_without_new_notes(vault: Path):
+    """2026-10-30: one failure, then two days with no notes and no retry."""
+    pending = vault / "indices_pending"
+    pending.write_text("index generator failed: earlier\n", encoding="utf-8")
+    marker = vault / "ran.txt"
+    _write_script(vault, f"open(r'{marker}', 'w').close()")
+    result = regenerate(_config(vault), wrote_notes=False, pending=pending)
+    assert result.ran and result.ok
+    assert marker.exists()
+    assert not pending.exists()
+
+
+def test_marker_stays_while_it_keeps_failing(vault: Path):
+    pending = vault / "indices_pending"
+    pending.write_text("index generator failed: earlier\n", encoding="utf-8")
+    _write_script(vault, "import sys\nsys.stderr.write('still broken\\n')\nraise SystemExit(2)")
+    result = regenerate(_config(vault), wrote_notes=False, pending=pending)
+    assert result.failed
+    assert "still broken" in pending.read_text(encoding="utf-8")
+
+
+def test_no_marker_no_retry(vault: Path):
+    marker = vault / "ran.txt"
+    _write_script(vault, f"open(r'{marker}', 'w').close()")
+    result = regenerate(_config(vault), wrote_notes=False, pending=vault / "indices_pending")
+    assert not result.ran
+    assert not marker.exists()
+
+
+def test_dry_run_does_not_retry(vault: Path):
+    pending = vault / "indices_pending"
+    pending.write_text("x\n", encoding="utf-8")
+    result = regenerate(_config(vault, dry_run=True), wrote_notes=False, pending=pending)
+    assert not result.ran
+    assert pending.exists()
+
+
+def test_stderr_on_success_comes_back_as_warnings(vault: Path):
+    """sc_vault skips a note it cannot open and says so on stderr, exit 0."""
+    _write_script(
+        vault, "import sys\nsys.stderr.write('sc_vault: skipped unreadable note X.md\\n')\n"
+    )
+    result = regenerate(_config(vault), wrote_notes=True)
+    assert result.ok
+    assert result.warnings == ["sc_vault: skipped unreadable note X.md"]
+
+
 # --- engine: script | sc_vault | auto -------------------------------------
 
 
