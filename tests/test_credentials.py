@@ -147,3 +147,22 @@ def test_decrypt_error_without_plaintext_raises(tmp_path: Path, monkeypatch):
 
     with pytest.raises(RuntimeError, match="Failed to decrypt"):
         credentials.load_credentials(path)
+
+
+def test_signed_out_enc_names_the_enc_file(tmp_path: Path, monkeypatch):
+    # Granola signed out (or mid-rewrite): the .enc decrypts but carries no tokens.
+    path = _enc_only(tmp_path, monkeypatch, _WORKOS)
+    monkeypatch.setattr(
+        encrypted_storage,
+        "decrypt_file",
+        lambda _p, _dek: json.dumps({"session_id": "s"}).encode(),
+    )
+
+    with pytest.raises(credentials.NoTokensError) as excinfo:
+        credentials.load_credentials(path)
+
+    enc_path = path.with_name(path.name + ".enc")
+    assert excinfo.value.source == enc_path
+    assert str(enc_path) in str(excinfo.value)
+    assert "signed in" in str(excinfo.value)
+    assert isinstance(excinfo.value, ValueError)  # older callers catch ValueError

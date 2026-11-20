@@ -145,6 +145,7 @@ def main() -> None:
 
     # Initialize components
     from .api.client import GranolaAPIClient
+    from .auth.credentials import NoTokensError
     from .auth.token_manager import TokenManager
     from .enrichment.claude_enricher import ClaudeEnricher
     from .sync.engine import SyncEngine
@@ -199,6 +200,9 @@ def main() -> None:
     except FileNotFoundError as e:
         console.print(f"\n[red]Error:[/red] {e}")
         console.print("Make sure the Granola app is installed and you've logged in at least once.")
+        sys.exit(1)
+    except NoTokensError as e:
+        console.print(f"\n[red]Error:[/red] {escape(str(e))}")
         sys.exit(1)
     except httpx.HTTPStatusError as e:
         console.print(

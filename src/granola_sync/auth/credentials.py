@@ -47,6 +47,22 @@ class CognitoTokens(BaseModel):
     obtained_at: int = 0
 
 
+class NoTokensError(ValueError):
+    """The credential file was read but holds no session tokens.
+
+    Happens when the Granola app is signed out, or caught mid-rewrite of its
+    credential file (it rewrites it on sign-in and on session refresh).
+    """
+
+    def __init__(self, source: Path) -> None:
+        self.source = source
+        super().__init__(
+            f"No valid tokens found in {source}. The Granola app has no active "
+            "session right now: open Granola, make sure you are signed in, and "
+            "run the sync again. If you just signed in, wait a few seconds first."
+        )
+
+
 def _enc_path(path: Path) -> Path:
     return encrypted_credentials_path(path)
 
@@ -58,8 +74,11 @@ def _mtime(path: Path) -> float:
         return 0.0
 
 
-def _read_raw(path: Path) -> dict:
-    """Read the credential blob, preferring the encrypted file when newer."""
+def _read_raw_with_source(path: Path) -> tuple[dict, Path]:
+    """Read the credential blob and say which file it came from.
+
+    Prefers the encrypted file when newer, mirroring the desktop app.
+    """
     enc_path = _enc_path(path)
     if (
         encrypted_storage.is_supported()
@@ -69,7 +88,7 @@ def _read_raw(path: Path) -> dict:
         try:
             dek = encrypted_storage.get_dek(path.parent)
             plaintext = encrypted_storage.decrypt_file(enc_path, dek)
-            return json.loads(plaintext)
+            return json.loads(plaintext), enc_path
         except Exception as e:
             # Recent Granola builds ship no plaintext twin, so there is nothing
             # to fall back to — surface the decryption failure instead.
@@ -77,7 +96,12 @@ def _read_raw(path: Path) -> dict:
                 raise RuntimeError(f"Failed to decrypt {enc_path}: {e}") from e
             logger.warning("Failed to decrypt %s, falling back to plaintext: %s", enc_path, e)
 
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8")), path
+
+
+def _read_raw(path: Path) -> dict:
+    """Read the credential blob, preferring the encrypted file when newer."""
+    return _read_raw_with_source(path)[0]
 
 
 def load_credentials(path: Path) -> WorkOSTokens:
@@ -87,9 +111,9 @@ def load_credentials(path: Path) -> WorkOSTokens:
 
     Raises:
         FileNotFoundError: If supabase.json doesn't exist.
-        ValueError: If no valid tokens are found.
+        NoTokensError: If no valid tokens are found (a ValueError).
     """
-    raw = _read_raw(path)
+    raw, source = _read_raw_with_source(path)
 
     # workos_tokens is stored as a JSON string within the JSON
     workos_str = raw.get("workos_tokens")
@@ -110,7 +134,7 @@ def load_credentials(path: Path) -> WorkOSTokens:
             obtained_at=cog.obtained_at,
         )
 
-    raise ValueError(f"No valid tokens found in {path}")
+    raise NoTokensError(source)
 
 
 def save_workos_tokens(path: Path, tokens: WorkOSTokens) -> None:

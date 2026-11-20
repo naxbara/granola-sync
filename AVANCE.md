@@ -1,6 +1,6 @@
 # Avance — Granolaupdater
 
-> Última actualización: 2026-11-02
+> Última actualización: 2026-11-20
 
 Sincroniza las notas de reunión de Granola al vault de Obsidian
 (`Reuniones/` + `Transcripciones/`). Repo: `github.com/naxbara/granola-sync`,
@@ -44,6 +44,13 @@ Sigue vigente; la Fase 6 de arriba se come solo una parte.
 ---
 
 ## Ejecutado
+
+### 2026-11-20
+
+- **Granola sin sesión ya no da un traceback.** Un sync manual de la mañana cayó con `ValueError: No valid tokens found in …\supabase.json`. Hacia las 9:12, Granola reescribió `supabase.json.enc` y `stored-accounts.json.enc` (re-login o renovación de sesión), y el archivo descifrado venía sin `workos_tokens`. Al rato ya traía tokens, y un dry-run funcionó sin tocar nada. El mensaje despistaba: nombraba `supabase.json`, que en el servidor ni existe, porque el archivo que se lee es el `.enc`.
+  - `credentials.py`: excepción `NoTokensError` (subclase de `ValueError`), que nombra el archivo que en verdad se leyó y dice qué hacer (abrir Granola, verificar la sesión, reintentar). El CLI la atrapa y sale con código 1, sin traceback.
+  - **Los `.bat` Diario y Semanal ya no dicen «Sincronizacion completada» cuando falla.** Leen el código de salida: `0` = completada, `3` = completada sin índices, cualquier otro = «FALLO (codigo N)». Terminan con `exit /b` del mismo código. Los IF van en una sola línea porque los `.bat` tienen fin de línea LF.
+  - 1 test nuevo en `test_credentials.py`, **196 en verde**. Los `.bat` se probaron con códigos simulados 0, 3 y 1.
 
 ### 2026-11-02
 
