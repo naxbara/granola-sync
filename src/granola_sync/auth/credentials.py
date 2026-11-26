@@ -1,12 +1,20 @@
-"""Read Granola credentials from the local supabase.json (and .enc) file.
+"""Read Granola credentials from the app's local storage.
 
-The supabase.json file has a quirk: token fields (workos_tokens, cognito_tokens)
-are stored as JSON *strings* inside the JSON file, requiring double parsing.
+Two layouts exist:
 
-Granola 2.x added an encrypted parallel file (supabase.json.enc). When present
-and newer than the plaintext file, the desktop app treats it as the source of
-truth. We mirror that behavior — read the encrypted file when newer, and write
-both formats on save so the desktop app picks up our refreshed tokens.
+* stored-accounts.json (Granola 7.8+, multi-account). The app migrates the
+  session out of supabase.json on first launch and leaves supabase.json empty:
+  ``{"version": 2, "currentUserId": "<id>",
+  "accountsById": {"<id>": {"user": {...}, "tokens": {<WorkOS tokens>}, ...}}}``.
+  Once it carries a ``version``, this file is the source of truth.
+
+* supabase.json (older builds). Token fields (workos_tokens, cognito_tokens)
+  are stored as JSON *strings* inside the JSON file, requiring double parsing.
+
+Granola 2.x added encrypted parallel files (*.json.enc). When present and newer
+than the plaintext file, the desktop app treats them as the source of truth. We
+mirror that behavior — read the encrypted file when newer, and write both
+formats on save so the desktop app picks up our refreshed tokens.
 """
 
 from __future__ import annotations
@@ -104,15 +112,69 @@ def _read_raw(path: Path) -> dict:
     return _read_raw_with_source(path)[0]
 
 
-def load_credentials(path: Path) -> WorkOSTokens:
-    """Load and parse tokens from supabase.json (or supabase.json.enc).
+STORED_ACCOUNTS_FILE = "stored-accounts.json"
 
-    Tries WorkOS tokens first, falls back to Cognito tokens.
+
+def stored_accounts_path(path: Path) -> Path:
+    """Return the stored-accounts.json that sits next to a supabase.json path."""
+    return path.with_name(STORED_ACCOUNTS_FILE)
+
+
+def _maybe_json(value):
+    """Decode a value the app may have stored as a JSON string."""
+    if isinstance(value, str):
+        try:
+            return json.loads(value)
+        except ValueError:
+            return value
+    return value
+
+
+def _read_stored_accounts(path: Path) -> tuple[dict, Path] | None:
+    """Read stored-accounts.json(.enc) when it is the app's source of truth.
+
+    Returns None when the file is missing or not migrated yet (no ``version``),
+    so the caller falls back to supabase.json.
+    """
+    accounts_path = stored_accounts_path(path)
+    if not (accounts_path.exists() or _enc_path(accounts_path).exists()):
+        return None
+    raw, source = _read_raw_with_source(accounts_path)
+    if not isinstance(raw, dict) or raw.get("version") is None:
+        return None
+    return raw, source
+
+
+def _current_account(raw: dict) -> dict | None:
+    """Return the signed-in account entry of a stored-accounts blob."""
+    accounts = _maybe_json(raw.get("accountsById")) or {}
+    user_id = _maybe_json(raw.get("currentUserId"))
+    if not isinstance(accounts, dict) or not user_id:
+        return None
+    account = accounts.get(user_id)
+    return account if isinstance(account, dict) else None
+
+
+def load_credentials(path: Path) -> WorkOSTokens:
+    """Load and parse the signed-in session's tokens.
+
+    Reads stored-accounts.json(.enc) when Granola already migrated to it;
+    otherwise supabase.json(.enc), where WorkOS tokens are tried first and
+    Cognito tokens are the fallback.
 
     Raises:
-        FileNotFoundError: If supabase.json doesn't exist.
+        FileNotFoundError: If no credential file exists.
         NoTokensError: If no valid tokens are found (a ValueError).
     """
+    stored = _read_stored_accounts(path)
+    if stored is not None:
+        raw, source = stored
+        account = _current_account(raw)
+        tokens = _maybe_json(account.get("tokens")) if account else None
+        if isinstance(tokens, dict) and tokens.get("access_token"):
+            return WorkOSTokens(**tokens)
+        raise NoTokensError(source)
+
     raw, source = _read_raw_with_source(path)
 
     # workos_tokens is stored as a JSON string within the JSON
@@ -138,14 +200,44 @@ def load_credentials(path: Path) -> WorkOSTokens:
 
 
 def save_workos_tokens(path: Path, tokens: WorkOSTokens) -> None:
-    """Persist updated WorkOS tokens back to supabase.json atomically.
+    """Persist updated WorkOS tokens back to Granola's storage atomically.
+
+    Writes to stored-accounts.json(.enc) when Granola already migrated to it
+    (updating only the signed-in account's tokens), else to supabase.json(.enc).
+    """
+    stored = _read_stored_accounts(path)
+    if stored is not None:
+        raw, source = stored
+        account = _current_account(raw)
+        if account is None:
+            raise NoTokensError(source)
+        old_tokens = account.get("tokens")
+        # Keep any token fields the app stores that our model does not know.
+        merged = {**(_maybe_json(old_tokens) or {}), **tokens.model_dump(exclude_none=True)}
+        account["tokens"] = (
+            json.dumps(merged, separators=(",", ":")) if isinstance(old_tokens, str) else merged
+        )
+        accounts = _maybe_json(raw.get("accountsById"))
+        accounts[_maybe_json(raw.get("currentUserId"))] = account
+        if isinstance(raw.get("accountsById"), str):
+            raw["accountsById"] = json.dumps(accounts, separators=(",", ":"))
+        else:
+            raw["accountsById"] = accounts
+        _write_blob(stored_accounts_path(path), raw)
+        return
+
+    raw = _read_raw(path)
+    raw["workos_tokens"] = json.dumps(tokens.model_dump(), separators=(",", ":"))
+    _write_blob(path, raw)
+
+
+def _write_blob(path: Path, raw: dict) -> None:
+    """Write a credential blob to ``path`` and its encrypted twin.
 
     Writes to a .tmp file first, then replaces the original to prevent
     corruption if the process crashes mid-write. When the encrypted variant
     exists, also rewrite it so the Granola desktop app reads our updates.
     """
-    raw = _read_raw(path)
-    raw["workos_tokens"] = json.dumps(tokens.model_dump(), separators=(",", ":"))
 
     def write_plaintext() -> None:
         tmp_path = path.with_suffix(".tmp")

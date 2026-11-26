@@ -48,12 +48,15 @@ def encrypted_credentials_path(path: Path) -> Path:
 
 
 def credentials_exist(path: Path) -> bool:
-    """True when the plaintext credentials file or its encrypted twin exists.
+    """True when any Granola credentials file (plaintext or encrypted) exists.
 
-    Recent Granola builds ship only the encrypted file, so the plaintext one
-    may legitimately be missing.
+    Recent Granola builds ship only encrypted files, and Granola 7.8+ keeps the
+    session in stored-accounts.json next to supabase.json, so either may be the
+    one present.
     """
-    return path.exists() or encrypted_credentials_path(path).exists()
+    accounts = path.with_name("stored-accounts.json")
+    candidates = (path, accounts)
+    return any(p.exists() or encrypted_credentials_path(p).exists() for p in candidates)
 
 
 def default_credentials_path() -> Path:

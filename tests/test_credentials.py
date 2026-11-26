@@ -166,3 +166,102 @@ def test_signed_out_enc_names_the_enc_file(tmp_path: Path, monkeypatch):
     assert str(enc_path) in str(excinfo.value)
     assert "signed in" in str(excinfo.value)
     assert isinstance(excinfo.value, ValueError)  # older callers catch ValueError
+
+
+# --- Granola 7.8+: stored-accounts.json(.enc) -------------------------------
+
+_USER_ID = "user-1"
+
+
+def _stored_accounts_blob(tokens: dict | None, current: str | None = _USER_ID) -> dict:
+    accounts = {}
+    if tokens is not None:
+        accounts[_USER_ID] = {
+            "user": {"id": _USER_ID, "email": "owner@example.com"},
+            "tokens": tokens,
+            "savedAt": 1,
+            "workspaces": [],
+        }
+    return {"version": 2, "currentUserId": current, "accountsById": accounts}
+
+
+def _migrated(tmp_path: Path, monkeypatch, blob: dict) -> tuple[Path, dict]:
+    """Granola dir after the 7.8 migration: emptied supabase.json.enc plus stored-accounts.
+
+    Returns the supabase.json path and a dict that records encrypted writes per file.
+    """
+    path = tmp_path / "supabase.json"
+    path.with_name("supabase.json.enc").write_bytes(b"empty")
+    path.with_name("stored-accounts.json.enc").write_bytes(b"accounts")
+    files = {
+        "supabase.json.enc": json.dumps({}),  # the app clears it after migrating
+        "stored-accounts.json.enc": json.dumps(blob),
+    }
+    writes: dict = {}
+
+    monkeypatch.setattr(encrypted_storage, "is_supported", lambda: True)
+    monkeypatch.setattr(encrypted_storage, "get_dek", lambda _dir: b"dek")
+    monkeypatch.setattr(
+        encrypted_storage, "decrypt_file", lambda p, _dek: files[Path(p).name].encode()
+    )
+    monkeypatch.setattr(encrypted_storage, "encrypt_bytes", lambda data, _dek: b"ENC:" + data)
+    return path, writes
+
+
+def test_loads_current_account_from_stored_accounts(tmp_path: Path, monkeypatch):
+    path, _ = _migrated(tmp_path, monkeypatch, _stored_accounts_blob({**_WORKOS, "access_token": "at-acc"}))
+    assert credentials.load_credentials(path).access_token == "at-acc"
+
+
+def test_stored_accounts_tokens_as_json_string(tmp_path: Path, monkeypatch):
+    blob = _stored_accounts_blob(None)
+    blob["accountsById"] = json.dumps(
+        {_USER_ID: {"user": {"id": _USER_ID}, "tokens": json.dumps({**_WORKOS, "access_token": "at-str"})}}
+    )
+    path, _ = _migrated(tmp_path, monkeypatch, blob)
+    assert credentials.load_credentials(path).access_token == "at-str"
+
+
+def test_stored_accounts_signed_out_names_that_file(tmp_path: Path, monkeypatch):
+    path, _ = _migrated(tmp_path, monkeypatch, _stored_accounts_blob(_WORKOS, current=None))
+    with pytest.raises(credentials.NoTokensError) as excinfo:
+        credentials.load_credentials(path)
+    assert excinfo.value.source == path.with_name("stored-accounts.json.enc")
+
+
+def test_unmigrated_stored_accounts_falls_back_to_supabase(tmp_path: Path, monkeypatch):
+    # Before the migration finishes there is no "version": supabase.json still rules.
+    path = _enc_only(tmp_path, monkeypatch, {**_WORKOS, "access_token": "at-legacy"})
+    path.with_name("stored-accounts.json").write_text(json.dumps({"accounts": "[]"}), encoding="utf-8")
+    assert credentials.load_credentials(path).access_token == "at-legacy"
+
+
+def test_save_updates_current_account_in_stored_accounts(tmp_path: Path, monkeypatch):
+    old = {**_WORKOS, "session_id": "sess", "extra_field": "keep-me"}
+    path, _ = _migrated(tmp_path, monkeypatch, _stored_accounts_blob(old))
+
+    new = credentials.WorkOSTokens(**{**_WORKOS, "access_token": "at-new", "refresh_token": "rt-new"})
+    credentials.save_workos_tokens(path, new)
+
+    accounts_enc = path.with_name("stored-accounts.json.enc").read_bytes()
+    assert accounts_enc.startswith(b"ENC:")
+    saved = json.loads(accounts_enc[len(b"ENC:"):])
+    tokens = saved["accountsById"][_USER_ID]["tokens"]
+    assert tokens["access_token"] == "at-new"
+    assert tokens["refresh_token"] == "rt-new"
+    assert tokens["extra_field"] == "keep-me"  # unknown fields survive
+    assert saved["accountsById"][_USER_ID]["user"]["email"] == "owner@example.com"
+    assert saved["currentUserId"] == _USER_ID and saved["version"] == 2
+    # Never touch the legacy file nor leak tokens in the clear.
+    assert path.with_name("supabase.json.enc").read_bytes() == b"empty"
+    assert not path.exists()
+    assert not path.with_name("stored-accounts.json").exists()
+
+
+def test_credentials_exist_sees_stored_accounts(tmp_path: Path):
+    from granola_sync.utils import credentials_exist
+
+    path = tmp_path / "supabase.json"
+    assert not credentials_exist(path)
+    path.with_name("stored-accounts.json.enc").write_bytes(b"x")
+    assert credentials_exist(path)

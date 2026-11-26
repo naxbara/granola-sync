@@ -1,6 +1,6 @@
 # Avance — Granolaupdater
 
-> Última actualización: 2026-11-20
+> Última actualización: 2026-11-25
 
 Sincroniza las notas de reunión de Granola al vault de Obsidian
 (`Reuniones/` + `Transcripciones/`). Repo: `github.com/naxbara/granola-sync`,
@@ -44,6 +44,14 @@ Sigue vigente; la Fase 6 de arriba se come solo una parte.
 ---
 
 ## Ejecutado
+
+### 2026-11-25
+
+- **Granola 7.821 movió la sesión a `stored-accounts.json.enc` y el sync dejó de leerla.** Granola se actualizó solo a las 19:34 en el servidor. Al arrancar, migra los tokens de `supabase.json` a `stored-accounts.json` y vacía el primero, que quedó en 30 bytes. Desde ese momento fallaron el sync de las 21:00 (`GranolaSyncDaily`, resultado 1) y el paso `sync` del digest, con «No valid tokens found», aunque Granola tenía la sesión abierta. Reabrir Granola no lo arreglaba. El formato nuevo se sacó del código de la app (`resources/app.asar`), sin abrir las credenciales: `{version: 2, currentUserId, accountsById: {<id>: {user, tokens, savedAt, workspaces}}}`, donde `tokens` es el mismo objeto WorkOS de antes.
+  - `credentials.py`: si `stored-accounts.json(.enc)` trae `version`, manda ese archivo, y se lee la cuenta de `currentUserId`. Sin `version` (antes de que la app migre), se sigue leyendo `supabase.json` como antes. La renovación de tokens escribe en el mismo archivo y solo toca los tokens de esa cuenta. Los campos de token que el modelo no conoce se conservan, y se mantiene el tipo, objeto o texto JSON, en que venían. La escritura cifrada y en texto plano quedó en `_write_blob`, común a los dos formatos.
+  - `utils.credentials_exist` también reconoce `stored-accounts.json(.enc)`.
+  - 6 tests nuevos en `test_credentials.py`, **202 en verde**. Un dry-run real a las 22:04 trajo 753 documentos, ninguno nuevo desde el sync manual de las 19:32, así que no hubo que rehacer el digest del día. **La escritura de tokens renovados contra el archivo real no se probó**: el token seguía vigente y no hubo renovación. La primera corrida que renueve el token es la prueba.
+  - Sin commit.
 
 ### 2026-11-20
 
